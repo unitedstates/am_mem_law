@@ -88,6 +88,7 @@ for code in codes:
 						"date": bill_date,
 						"description": bill_description,
 						"committees": committee_info.split( "~" ),
+						"image": "http://memory.loc.gov/ll/%s/%s/%s00/%s" % ( code, volume, image_name[0:2], image_name )
 					}
 
 					if congress not in bills:
