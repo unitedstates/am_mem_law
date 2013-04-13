@@ -18,6 +18,7 @@ LL_PATH = sys.argv[1]
 ###
 
 codes = [ "llhb", "llsb" ]
+image_path_template = "http://memory.loc.gov/ll/%s/%s/%s00/%s.%s"
 
 chambers = { "llhb": "h", "llsb": "s" }
 bill_types = {
@@ -35,7 +36,7 @@ bills = {}
 bill_no_types = set()
 unknown_bill_types = {}
 
-bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)?$" )
+bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$" )
 
 for code in codes:
 	code_dir = LL_PATH + code
@@ -52,7 +53,13 @@ for code in codes:
 					if image[1] != volume:
 						raise ValueError( "Unexpected volume" )
 
-					image_name = image[2]
+					image_name = image[2][0:image[2].index( "." )]
+
+					urls = {
+						"tiff": image_path_template % ( code, volume, image_name[0:2], image_name, "tif" ),
+						"gif": image_path_template % ( code, volume, image_name[0:2], image_name, "gif" ),
+					}
+
 					congress = str( int( image[3] ) )
 					session = str( int( image[4] ) )
 					chamber = image[5]
@@ -66,6 +73,8 @@ for code in codes:
 
 					if bill_no_matches is None:
 						print "Unexpected bill number in %s, volume %s (%s-%s): %s" % ( code, volume, congress, session, bill_no )
+						bill_type = "ammem-%s-%s-unk" % ( code, volume )
+						bill_number = image_name
 					else:
 						bill_type_orig = bill_no_matches.group( 1 )
 						bill_number = bill_no_matches.group( 2 )
@@ -81,7 +90,7 @@ for code in codes:
 								unknown_bill_types[bill_type_orig] = set()
 							unknown_bill_types[bill_type_orig].add( "%s-%s" % ( code, volume ) )
 
-							bill_type = bill_type_orig
+							bill_type = "ammem-%s-%s-%s" % ( code, volume, bill_type_orig )
 
 					page_no = 1 if image[6] == "" else str( int( image[6] ) )
 
@@ -147,7 +156,7 @@ for code in codes:
 						"status_at": bill_date,
 						"description": bill_description,
 						"committees": committees,
-						"image": "http://memory.loc.gov/ll/%s/%s/%s00/%s" % ( code, volume, image_name[0:2], image_name ),
+						"urls": urls,
 
 						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat() # XXX: congress.utils.format_datetime()
 					}
@@ -155,13 +164,10 @@ for code in codes:
 					if congress not in bills:
 						bills[congress] = {}
 
-					if session not in bills[congress]:
-						bills[congress][session] = {}
+					if bill_type not in bills[congress]:
+						bills[congress][bill_type] = []
 
-					if chamber not in bills[congress][session]:
-						bills[congress][session][chamber] = []
-
-					bills[congress][session][chamber].append( bill )
+					bills[congress][bill_type].append( bill )
 			except csv.Error as e:
 				# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
 				print "Error parsing %s, volume %s: %s" % ( code, volume, e )
@@ -172,9 +178,11 @@ print bill_no_types
 print unknown_bill_types
 
 for congress in bills:
-	for session in bills[congress]:
-		for chamber in bills[congress][session]:
-			bill_dir = "bills/%s/%s" % ( congress, session )
+	for bill_type in bills[congress]:
+		for bill in bills[congress][bill_type]:
+			# XXX: congress.utils.write()
+
+			bill_dir = "%s/%s/bills/%s/%s%s" % ( "data", congress, bill_type, bill_type, bill["number"] )
 
 			try:
 				os.makedirs( bill_dir )
@@ -182,7 +190,7 @@ for congress in bills:
 				# Directory already exists, but we don't care.
 				pass
 
-			bill_path = "%s/%s.json" % ( bill_dir, chamber )
+			bill_path = "%s/data.json" % ( bill_dir )
 
 			print "Writing %s..." % ( bill_path )
-			open( bill_path, "w" ).write( json.dumps( bills[congress][session][chamber], indent=2, ensure_ascii=False ) )
+			open( bill_path, "w" ).write( json.dumps( bill, indent=2, ensure_ascii=False ) )
