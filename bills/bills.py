@@ -20,7 +20,14 @@ LL_PATH = sys.argv[1]
 codes = [ "llhb", "llsb" ]
 
 chambers = { "llhb": "h", "llsb": "s" }
-bill_types = { "H.R.": "hr", "H.R. No.": "hr", "": "hr", "No.": "hr", "S.": "s" }
+bill_types = {
+	"H.R.": "hr",
+	"No.": "hr",
+	"H.R. No.": "hr",
+	"": "hr",
+	"H.R.C.C.": "hrcc",
+	"S.": "s",
+}
 
 bills = {}
 
@@ -103,14 +110,26 @@ for code in codes:
 
 					bill_description = image[9]
 
+					committees = []
+
 					try:
-						committee_info = image[10]
+						committee_names = image[10]
 					except IndexError:
 						# Some entries don't have a committee field, so we'll have to fudge it.
-						committee_info = ""
+						committee_names = ""
+
+					for committee in committee_names.split( "~" ):
+						if committee != "":
+							committee_info = {
+								"committee": committee,
+								"activity": [], # XXX
+								"committee_id": None, # XXX
+							}
+
+							committees.append( committee_info )
 
 					if page_no != 1:
-						if ( bill_description != "" ) or ( committee_info != "" ):
+						if ( bill_description != "" ) or ( committee_names != "" ):
 							print "Page %s of bill %s in %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, code, volume, congress, session )
 						else:
 							# XXX: For now, ignore secondary pages; we may want to revisit this.
@@ -127,7 +146,7 @@ for code in codes:
 
 						"status_at": bill_date,
 						"description": bill_description,
-						"committees": committee_info.split( "~" ),
+						"committees": committees,
 						"image": "http://memory.loc.gov/ll/%s/%s/%s00/%s" % ( code, volume, image_name[0:2], image_name ),
 
 						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat() # XXX: congress.utils.format_datetime()
