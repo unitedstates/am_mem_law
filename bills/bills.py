@@ -22,12 +22,13 @@ image_path_template = "http://memory.loc.gov/ll/%s/%s/%s00/%s.%s"
 
 chambers = { "llhb": "h", "llsb": "s" }
 bill_types = {
-	"H.R.": "hr",
-	"No.": "hr",
-	"H.R. No.": "hr",
-	"": "hr",
-	"H.R.C.C.": "hrcc",
+	"No.": "hr", # Early House bills were just listed as "No."
+	"H.R.": "hr", # Note: Some House bills originally listed with "No." were transcribed as "H.R."
+	"H.R. No.": "hr", # A small number of House bills are listed as "H.R. No."
+	"": "hr", # House bills in certain Congresses are listed only by number.
+	"H.R.C.C.": "hrcc", # House Court of Claims report
 	"S.": "s",
+	#"S.R.": "sjres", # "S.R." is either a Senate Joint Resolution or a Senate bill considered in the House
 }
 
 bills = {}
@@ -182,7 +183,7 @@ for congress in bills:
 		for bill in bills[congress][bill_type]:
 			# XXX: congress.utils.write()
 
-			bill_dir = "%s/%s/bills/%s/%s%s" % ( "data", congress, bill_type, bill_type, bill["number"] )
+			bill_dir = "%s/%s/bills/%s/%s%s" % ( "data", congress, bill_type, bill_type, bill["number"] ) # XXX: congress.utils.data_dir()
 
 			try:
 				os.makedirs( bill_dir )
