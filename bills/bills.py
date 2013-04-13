@@ -51,11 +51,14 @@ for code in codes:
 #						print "Bill %s in %s-%s-%s has multiple dates!" % ( bill_no, code, congress, session )
 
 					try:
+						# Most dates are of a Ymd format.
 						bill_date = datetime.datetime.strptime( bill_dates[0], "%Y%m%d" )
 					except ValueError:
 						try:
+							# Sometimes a bill doesn't specify a day, so it's encoded as '00'.
 							bill_date = datetime.datetime.strptime( bill_dates[0], "%Y%m00" )
 						except ValueError:
+							# Certain dates have typos (like invalid values for month or day, or extra digits).
 							print "Bill %s in %s-%s-%s has an invalid date: %s" % ( bill_no, code, congress, session, bill_dates[0] )
 							continue
 
@@ -63,7 +66,12 @@ for code in codes:
 					bill_date = "%04d-%02d-%02d" % ( bill_date.year, bill_date.month, bill_date.day )
 
 					bill_description = image[9]
-					committee_info = image[10] if 10 in image else ""
+
+					try:
+						committee_info = image[10]
+					except IndexError:
+						# Some entries don't have a committee field, so we'll have to fudge it.
+						committee_info = ""
 
 					if page_no != "":
 						if ( bill_description != "" ) or ( committee_info != "" ):
