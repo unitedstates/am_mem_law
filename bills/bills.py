@@ -56,7 +56,10 @@ for code in codes:
 
 					image_name = image[2][0:image[2].index( "." )]
 
+					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( code, volume, code, volume, ( int( image_name[0:4] ) - 1 ) )
+
 					urls = {
+						"web": ampage_url,
 						"tiff": image_path_template % ( code, volume, image_name[0:2], image_name, "tif" ),
 						"gif": image_path_template % ( code, volume, image_name[0:2], image_name, "gif" ),
 					}
@@ -145,6 +148,17 @@ for code in codes:
 							# XXX: For now, ignore secondary pages; we may want to revisit this.
 							continue
 
+					sources = []
+
+					source = {
+						"source": "ammem",
+						"code": code,
+						"volume": volume,
+						"source_url": ampage_url,
+					}
+
+					sources.append( source )
+
 					bill = {
 						"bill_id": bill_id,
 						"bill_type": bill_type,
@@ -159,6 +173,7 @@ for code in codes:
 						"committees": committees,
 						"urls": urls,
 
+						"sources": sources,
 						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat() # XXX: congress.utils.format_datetime()
 					}
 
