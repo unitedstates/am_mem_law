@@ -17,6 +17,34 @@ LL_PATH = sys.argv[1]
 
 ###
 
+def format_bill_date( bill_date_orig ):
+#	try:
+#		# Most dates are of a Ymd format.
+#		bill_date = datetime.datetime.strptime( bill_date_orig, "%Y%m%d" )
+#	except ValueError:
+#		try:
+#			# Sometimes a bill doesn't specify a day, so it's encoded as '00'.
+#			bill_date = datetime.datetime.strptime( bill_date_orig, "%Y%m00" )
+#		except ValueError:
+#			# Certain dates have typos (like invalid values for month or day, or extra digits).
+#			print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, code, volume, congress, session, bill_dates[0] )
+#			continue
+#
+#	# For some reason, datetime doesn't support years < 1900.
+#	return ( "%04d-%02d-%02d" % ( bill_date.year, bill_date.month, bill_date.day ) )
+
+	bill_date_matches = re.search( "^([0-9]{4})([0-9]{2})([0-9]{2})$", bill_date_orig )
+
+	if bill_date_matches is None:
+		return None
+
+	year = bill_date_matches.group( 1 )
+	month = bill_date_matches.group( 2 )
+	day = bill_date_matches.group( 3 )
+
+	return ( "%s-%s-%s" % ( year, month, day ) ) #( "%04d-%02d-%02d" % ( year, month, day ) )
+
+
 codes = [ "llhb", "llsb" ]
 image_path_template = "http://memory.loc.gov/ll/%s/%s/%s00/%s.%s"
 
@@ -81,7 +109,7 @@ for code in codes:
 						bill_number = image_name
 					else:
 						bill_type_orig = bill_no_matches.group( 1 )
-						bill_number = bill_no_matches.group( 2 )
+						bill_number = bill_no_matches.group( 2 ).replace( " 1/2", ".5" ) # XXX: Some bills have been assigned fractional numbers.
 
 						# XXX
 						bill_no_types.add( bill_type_orig )
@@ -102,24 +130,21 @@ for code in codes:
 
 					bill_dates = image[8].split( "," )
 
-					# XXX: The date of action sometimes differs from the date of printing, so both are listed.
-#					if len( bill_dates ) > 1:
-#						print "Bill %s in %s-%s-%s has multiple dates!" % ( bill_no, code, congress, session )
+					actions = []
 
-					try:
-						# Most dates are of a Ymd format.
-						bill_date = datetime.datetime.strptime( bill_dates[0], "%Y%m%d" )
-					except ValueError:
-						try:
-							# Sometimes a bill doesn't specify a day, so it's encoded as '00'.
-							bill_date = datetime.datetime.strptime( bill_dates[0], "%Y%m00" )
-						except ValueError:
-							# Certain dates have typos (like invalid values for month or day, or extra digits).
-							print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, code, volume, congress, session, bill_dates[0] )
-							continue
+					# Sometimes the bill has multiple dates associated with it, so we'll treat each as a separate action.
+					for bill_date in bill_dates:
+						action = {
+							"acted_at": format_bill_date( bill_date ),
+						}
 
-					# For some reason, datetime doesn't support years < 1900.
-					bill_date = "%04d-%02d-%02d" % ( bill_date.year, bill_date.month, bill_date.day )
+						actions.append( action )
+
+					bill_date = format_bill_date( bill_dates[-1] ) # XXX: congress.bill_info.latest_status()
+
+					if bill_date is None:
+						# Certain dates have typos (like invalid values for month or day, or extra digits).
+						print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, code, volume, congress, session, bill_dates[-1] )
 
 					bill_description = image[9]
 
@@ -168,13 +193,17 @@ for code in codes:
 						"session": session,
 						"chamber": chamber,
 
+						"actions": actions,
 						"status_at": bill_date,
+
 						"description": bill_description,
+
 						"committees": committees,
-						"urls": urls,
 
 						"sources": sources,
-						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat() # XXX: congress.utils.format_datetime()
+						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat(), # XXX: congress.utils.format_datetime()
+
+						"urls": urls,
 					}
 
 					if congress not in bills:
