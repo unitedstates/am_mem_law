@@ -46,7 +46,7 @@ def format_bill_date( bill_date_orig ):
 
 
 codes = [ "llhb", "llsb" ]
-image_path_template = "http://memory.loc.gov/ll/%s/%s/%s00/%s.%s"
+image_path_template = "http://memory.loc.gov/ll/%s/%s/%s/%s.%s"
 
 chambers = { "llhb": "h", "llsb": "s" }
 bill_types = {
@@ -83,13 +83,19 @@ for code in codes:
 						raise ValueError( "Unexpected volume" )
 
 					image_name = image[2][0:image[2].index( "." )]
+					resource_number = image_name[0:4]
+					resource_number_set = "%s00" % resource_number[0:2]
+
+					page_no = 1 if image[6] == "" else int( image[6] )
+
+					main_resource_number = "%04d" % ( int( resource_number ) - ( page_no - 1 ) )
 
 					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( code, volume, code, volume, ( int( image_name[0:4] ) - 1 ) )
 
 					urls = {
 						"web": ampage_url,
-						"tiff": image_path_template % ( code, volume, image_name[0:2], image_name, "tif" ),
-						"gif": image_path_template % ( code, volume, image_name[0:2], image_name, "gif" ),
+						"tiff": image_path_template % ( code, volume, resource_number_set, image_name, "tif" ),
+						"gif": image_path_template % ( code, volume, resource_number_set, image_name, "gif" ),
 					}
 
 					congress = str( int( image[3] ) )
@@ -103,10 +109,11 @@ for code in codes:
 
 					bill_no_matches = bill_no_pattern.search( bill_no )
 
+					# The bill number provided doesn't match the expected format, so we have to ensure we use a unique one.
 					if bill_no_matches is None:
 						print "Unexpected bill number in %s, volume %s (%s-%s): %s" % ( code, volume, congress, session, bill_no )
 						bill_type = "ammem-%s-%s-unk" % ( code, volume )
-						bill_number = image_name
+						bill_number = main_resource_number
 					else:
 						bill_type_orig = bill_no_matches.group( 1 )
 						bill_number = bill_no_matches.group( 2 ).replace( " 1/2", ".5" ) # XXX: Some bills have been assigned fractional numbers.
@@ -114,6 +121,7 @@ for code in codes:
 						# XXX
 						bill_no_types.add( bill_type_orig )
 
+						# If we don't recognize the bill type provided, create a special bill type that we'll know to check later.
 						if bill_type_orig in bill_types:
 							bill_type = bill_types[bill_type_orig]
 						else:
@@ -123,8 +131,6 @@ for code in codes:
 							unknown_bill_types[bill_type_orig].add( "%s-%s" % ( code, volume ) )
 
 							bill_type = "ammem-%s-%s-%s" % ( code, volume, bill_type_orig )
-
-					page_no = 1 if image[6] == "" else str( int( image[6] ) )
 
 					bill_id = "%s%s-%s" % ( bill_type, bill_number, congress )
 
@@ -168,10 +174,12 @@ for code in codes:
 
 					if page_no != 1:
 						if ( bill_description != "" ) or ( committee_names != "" ):
-							print "Page %s of bill %s in %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, code, volume, congress, session )
+							print "Page %d of bill %s in %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, code, volume, congress, session )
 						else:
-							# XXX: For now, ignore secondary pages; we may want to revisit this.
-							continue
+							# If we know the real bill_id, append the additional URL; otherwise, let it have its own bill entry.
+							if bill_id in bills[congress][bill_type]:
+								bills[congress][bill_type][bill_id]["urls"][page_no] = urls
+								continue
 
 					sources = []
 
@@ -192,6 +200,7 @@ for code in codes:
 
 						"session": session,
 						"chamber": chamber,
+						"bill_no": bill_no, # The original bill number, before parsing.
 
 						"actions": actions,
 						"status_at": bill_date,
@@ -203,16 +212,16 @@ for code in codes:
 						"sources": sources,
 						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat(), # XXX: congress.utils.format_datetime()
 
-						"urls": urls,
+						"urls": { page_no: urls },
 					}
 
 					if congress not in bills:
 						bills[congress] = {}
 
 					if bill_type not in bills[congress]:
-						bills[congress][bill_type] = []
+						bills[congress][bill_type] = {}
 
-					bills[congress][bill_type].append( bill )
+					bills[congress][bill_type][bill_id] = bill
 			except csv.Error as e:
 				# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
 				print "Error parsing %s, volume %s: %s" % ( code, volume, e )
@@ -224,7 +233,9 @@ print unknown_bill_types
 
 for congress in bills:
 	for bill_type in bills[congress]:
-		for bill in bills[congress][bill_type]:
+		for bill_id in bills[congress][bill_type]:
+			bill = bills[congress][bill_type][bill_id]
+
 			# XXX: congress.utils.write()
 
 			bill_dir = "%s/%s/bills/%s/%s%s" % ( "data", congress, bill_type, bill_type, bill["number"] ) # XXX: congress.utils.data_dir()
