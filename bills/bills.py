@@ -130,7 +130,7 @@ for code in codes:
 								unknown_bill_types[bill_type_orig] = set()
 							unknown_bill_types[bill_type_orig].add( "%s-%s" % ( code, volume ) )
 
-							bill_type = "ammem-%s-%s-%s" % ( code, volume, bill_type_orig )
+							bill_type = "ammem-%s-%s-%s" % ( code, volume, bill_type_orig.lower().replace( '.', '' ).replace( ' ', '' ) )
 
 					bill_id = "%s%s-%s" % ( bill_type, bill_number, congress )
 
