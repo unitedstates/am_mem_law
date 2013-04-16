@@ -176,9 +176,11 @@ for code in codes:
 						if ( bill_description != "" ) or ( committee_names != "" ):
 							print "Page %d of bill %s in %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, code, volume, congress, session )
 						else:
-							# If we know the real bill_id, append the additional URL; otherwise, let it have its own bill entry.
+							# If we know the real bill_id, append the additional information to the main bill entry.
+							# Otherwise, let it have its own bill entry.
 							if bill_id in bills[congress][bill_type]:
 								bills[congress][bill_type][bill_id]["urls"][page_no] = urls
+								bills[congress][bill_type][bill_id]["metadata"].append( image )
 								continue
 
 					sources = []
@@ -193,6 +195,8 @@ for code in codes:
 					sources.append( source )
 
 					bill = {
+						"metadata": [ image ], # The original metadata, before parsing.
+
 						"bill_id": bill_id,
 						"bill_type": bill_type,
 						"number": bill_number,
@@ -200,7 +204,6 @@ for code in codes:
 
 						"session": session,
 						"chamber": chamber,
-						"bill_no": bill_no, # The original bill number, before parsing.
 
 						"actions": actions,
 						"status_at": bill_date,
