@@ -64,6 +64,7 @@ bills = {}
 # XXX
 bill_no_types = set()
 unknown_bill_types = {}
+orphaned_pages = []
 
 bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$" )
 
@@ -83,14 +84,17 @@ for code in codes:
 						raise ValueError( "Unexpected volume" )
 
 					image_name = image[2][0:image[2].index( "." )]
+
 					resource_number = image_name[0:4]
+					resource_page = image_name[4:8]
+
 					resource_number_set = "%s00" % resource_number[0:2]
 
 					page_no = 1 if image[6] == "" else int( image[6] )
 
 					main_resource_number = "%04d" % ( int( resource_number ) - ( page_no - 1 ) )
 
-					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( code, volume, code, volume, ( int( image_name[0:4] ) - 1 ) )
+					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( code, volume, code, volume, ( int( resource_number ) - 1 ) )
 
 					urls = {
 						"web": ampage_url,
@@ -134,24 +138,6 @@ for code in codes:
 
 					bill_id = "%s%s-%s" % ( bill_type, bill_number, congress )
 
-					bill_dates = image[8].split( "," )
-
-					actions = []
-
-					# Sometimes the bill has multiple dates associated with it, so we'll treat each as a separate action.
-					for bill_date in bill_dates:
-						action = {
-							"acted_at": format_bill_date( bill_date ),
-						}
-
-						actions.append( action )
-
-					bill_date = format_bill_date( bill_dates[-1] ) # XXX: congress.bill_info.latest_status()
-
-					if bill_date is None:
-						# Certain dates have typos (like invalid values for month or day, or extra digits).
-						print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, code, volume, congress, session, bill_dates[-1] )
-
 					bill_description = image[9]
 
 					committees = []
@@ -172,16 +158,48 @@ for code in codes:
 
 							committees.append( committee_info )
 
+					bill_dates = image[8].split( "," )
+
+					actions = []
+
+					# Sometimes the bill has multiple dates associated with it, so we'll treat each as a separate action.
+					for bill_date in bill_dates:
+						action = {
+							"acted_at": format_bill_date( bill_date ),
+							"text": bill_description,
+						}
+
+						if committee_names != "":
+							action["committee"] = committee_names
+
+						actions.append( action )
+
+					bill_date = format_bill_date( bill_dates[-1] ) # XXX: congress.bill_info.latest_status()
+
+					if bill_date is None:
+						# Certain dates have typos (like invalid values for month or day, or extra digits).
+						print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, code, volume, congress, session, bill_dates[-1] )
+
+					# If this is a secondary page or another resource about the same bill, append the data to the existing entry.
+					if ( congress in bills ) and ( bill_type in bills[congress] ) and ( bill_id in bills[congress][bill_type] ):
+						# If this contains new information about the bill, extract it.
+						if ( page_no == 1 ) or ( ( page_no != 1 ) and ( ( bill_description != "" ) or ( committee_names != "" ) ) ):
+							bills[congress][bill_type][bill_id]["actions"].extend( actions )
+							bills[congress][bill_type][bill_id]["committees"].extend( committees )
+
+						bills[congress][bill_type][bill_id]["metadata"].append( image )
+
+						if main_resource_number not in bills[congress][bill_type][bill_id]["urls"]:
+							bills[congress][bill_type][bill_id]["urls"][main_resource_number] = {}
+
+						bills[congress][bill_type][bill_id]["urls"][main_resource_number][page_no] = urls
+
+						continue
+
+					# Check for orphaned pages.
 					if page_no != 1:
-						if ( bill_description != "" ) or ( committee_names != "" ):
-							print "Page %d of bill %s in %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, code, volume, congress, session )
-						else:
-							# If we know the real bill_id, append the additional information to the main bill entry.
-							# Otherwise, let it have its own bill entry.
-							if bill_id in bills[congress][bill_type]:
-								bills[congress][bill_type][bill_id]["urls"][page_no] = urls
-								bills[congress][bill_type][bill_id]["metadata"].append( image )
-								continue
+						print "Page %d of bill %s in %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, code, volume, congress, session )
+						orphaned_pages.append( bill_id )
 
 					sources = []
 
@@ -215,7 +233,7 @@ for code in codes:
 						"sources": sources,
 						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat(), # XXX: congress.utils.format_datetime()
 
-						"urls": { page_no: urls },
+						"urls": { main_resource_number: { page_no: urls } },
 					}
 
 					if congress not in bills:
@@ -229,10 +247,6 @@ for code in codes:
 				# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
 				print "Error parsing %s, volume %s: %s" % ( code, volume, e )
 				continue
-
-# XXX
-print bill_no_types
-print unknown_bill_types
 
 for congress in bills:
 	for bill_type in bills[congress]:
@@ -253,3 +267,8 @@ for congress in bills:
 
 			print "Writing %s..." % ( bill_path )
 			open( bill_path, "w" ).write( json.dumps( bill, indent=2, ensure_ascii=False ) )
+
+# XXX
+print "All Bill Types:", bill_no_types
+print "Unrecognized Bill Types:", unknown_bill_types
+print "Bills with Orphaned Pages:", orphaned_pages
