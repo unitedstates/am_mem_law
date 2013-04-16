@@ -11,7 +11,7 @@ From the collection:
 
 A select number of documents and reports from the monumental U.S. Congressional Serial Set are available as well.
 
-Scans of the original documents (TIF/GIF/JPG), metadata (.TXT), and in some cases transcribed text (SGM) are available within each collection at http://memory.loc.gov:8081/ll/llsl/.
+Scans of the original documents (TIF/GIF/JPG), metadata (.TXT), and in some cases transcribed text (SGM) are available within each collection at http://memory.loc.gov:8081/ll/.
 
 The collections are:
 
@@ -25,22 +25,22 @@ The collections are:
 * lled: Debates in the Several State Conventions on the Adoption of the Federal Constitution (1787-88), or Elliot's Debates
 * llej: Senate Executive Journal (1789-1875)
 * llfr: Records of the Federal Convention of 1787, or Farrand's Records
-* llhb: Bills in the House of Representatives (6th Congress (1799)-?)
+* llhb: Bills in the House of Representatives (6th Congress-42nd Congress (1799-1873), excluding the 12th Congress)
 * llhj: Journals of the House of Representatives (1789-1875)
 * lljc: Journals of the Continental Congress (1774-89)
-* llmisc/awh: (unknown)
+* llmisc/awh: (unknown, but related to women's history)
 * llmisc/ody: Laws in Relation to Freedmen, U.S. Senate, 39th Congress, 2nd Session
 * llmj: Journal of William Maclay (1789-91), senator from Pennsylvania in the 1st Congress
 * llnc: Native American Constitutions, Charters, and Bylaws
 * llnt: Native American Tribal Laws, Codes, and Statutes
 * llrd: Register of Debates (1824-37)
-* llsb: Bills in the Senate (16th Congress (1819)-?)
+* llsb: Bills in the Senate (15th Congress-42nd Congress (1819-1873))
 * llsc: The Slavery Code of the District of Columbia (1860)
 * llsj: Journals of the Senate (1789-1875)
 * llsl: Statutes at Large (1789-1875)
 * llsp: American State Papers (1789-1838)
 * llsr: Senate Resolutions/Joint Resolutions (dates?)
-* llss: (unknown)
+* llss: United States Serial Set
 * llst: Slavery in the Courtroom, 1722-1862
 * lltr: United States Treaties and Other International Agreements, 1950-
 * llts: The Senate, 1789-1989
