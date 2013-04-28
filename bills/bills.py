@@ -255,7 +255,7 @@ for congress in bills:
 
 			# XXX: congress.utils.write()
 
-			bill_dir = "%s/%s/bills/%s/%s%s" % ( "data", congress, bill_type, bill_type, bill["number"] ) # XXX: congress.utils.data_dir()
+			bill_dir = "%s/%s/bills/%s/%s%s" % ( "data/congresses", congress, bill_type, bill_type, bill["number"] ) # XXX: congress.utils.data_dir()
 
 			try:
 				os.makedirs( bill_dir )

@@ -1,0 +1,8 @@
+/data/congresses/
+*.db
+*.data
+*.ent
+*.omt
+*.pgi
+*.ref
+*.sgm*
