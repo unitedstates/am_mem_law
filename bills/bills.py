@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
-import sys
-import os
+import sys, os
 import datetime, time
 import re
-import csv
 import json
 
 # XXX: congress.utils.format_datetime()
@@ -13,7 +11,7 @@ from pytz import timezone
 ###
 
 # Path to LL metadata.
-LL_PATH = sys.argv[1]
+LL_PATH = sys.argv[1] if len(sys.argv) > 1 else "./data/collections/"
 
 ###
 
@@ -27,7 +25,7 @@ def format_bill_date( bill_date_orig ):
 #			bill_date = datetime.datetime.strptime( bill_date_orig, "%Y%m00" )
 #		except ValueError:
 #			# Certain dates have typos (like invalid values for month or day, or extra digits).
-#			print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, code, volume, congress, session, bill_dates[0] )
+#			print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, collection, volume, congress, session, bill_dates[0] )
 #			continue
 #
 #	# For some reason, datetime doesn't support years < 1900.
@@ -45,7 +43,7 @@ def format_bill_date( bill_date_orig ):
 	return ( "%s-%s-%s" % ( year, month, day ) ) #( "%04d-%02d-%02d" % ( year, month, day ) )
 
 
-codes = [ "llhb", "llsb" ]
+collections = [ "llhb", "llsb" ]
 image_path_template = "http://memory.loc.gov/ll/%s/%s/%s/%s.%s"
 
 chambers = { "llhb": "h", "llsb": "s" }
@@ -68,55 +66,55 @@ orphaned_pages = []
 
 bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$" )
 
-for code in codes:
-	code_dir = LL_PATH + code
-	for volume in os.listdir( code_dir ):
-		with open( code_dir + "/" + volume + "/" + code + volume + ".txt" ) as metadata:
-			print "Parsing %s, volume %s..." % ( code, volume )
+for collection in collections:
+	collection_dir = LL_PATH + collection
+	for volume in os.listdir( collection_dir ):
+		try:
+			with open( collection_dir + "/" + volume + "/" + collection + volume + ".json" ) as json_file:
+				print "Parsing JSON file for collection %s, volume %s..." % ( collection, volume )
 
-			reader = csv.reader( metadata )
-			try:
-				for image in reader:
-					if image[0] != code:
-						raise ValueError( "Unexpected code" )
+				metadata = json.load(json_file)
+				for image in metadata:
+					if image["collection"] != collection:
+						raise ValueError( "Unexpected collection" )
 
-					if image[1] != volume:
+					if image["volume"] != volume:
 						raise ValueError( "Unexpected volume" )
 
-					image_name = image[2][0:image[2].index( "." )]
+					image_name = image["tiff_filename"][0:image["tiff_filename"].index( "." )]
 
 					resource_number = image_name[0:4]
 					resource_page = image_name[4:8]
 
 					resource_number_set = "%s00" % resource_number[0:2]
 
-					page_no = 1 if image[6] == "" else int( image[6] )
+					page_no = 1 if image["page"] == "" else int( image["page"] )
 
 					main_resource_number = "%04d" % ( int( resource_number ) - ( page_no - 1 ) )
 
-					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( code, volume, code, volume, ( int( resource_number ) - 1 ) )
+					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( collection, volume, collection, volume, ( int( resource_number ) - 1 ) )
 
 					urls = {
 						"web": ampage_url,
-						"tiff": image_path_template % ( code, volume, resource_number_set, image_name, "tif" ),
-						"gif": image_path_template % ( code, volume, resource_number_set, image_name, "gif" ),
+						"tiff": image_path_template % ( collection, volume, resource_number_set, image_name, "tif" ),
+						"gif": image_path_template % ( collection, volume, resource_number_set, image_name, "gif" ),
 					}
 
-					congress = str( int( image[3] ) )
-					session = str( int( image[4] ) )
-					chamber = image[5]
+					congress = str( int( image["congress"] ) )
+					session = str( int( image["session"] ) )
+					chamber = image["chamber"]
 
-					if chamber != chambers[code]:
+					if chamber != chambers[collection]:
 						raise ValueError( "Unexpected chamber" )
 
-					bill_no = image[7].strip()
+					bill_no = image["bill_number"].strip()
 
 					bill_no_matches = bill_no_pattern.search( bill_no )
 
 					# The bill number provided doesn't match the expected format, so we have to ensure we use a unique one.
 					if bill_no_matches is None:
-						print "Unexpected bill number in %s, volume %s (%s-%s): %s" % ( code, volume, congress, session, bill_no )
-						bill_type = "ammem-%s-%s-unk" % ( code, volume )
+						print "Unexpected bill number in %s, volume %s (%s-%s): %s" % ( collection, volume, congress, session, bill_no )
+						bill_type = "ammem-%s-%s-unk" % ( collection, volume )
 						bill_number = main_resource_number
 					else:
 						bill_type_orig = bill_no_matches.group( 1 )
@@ -132,18 +130,18 @@ for code in codes:
 							# XXX
 							if bill_type_orig not in unknown_bill_types:
 								unknown_bill_types[bill_type_orig] = set()
-							unknown_bill_types[bill_type_orig].add( "%s-%s" % ( code, volume ) )
+							unknown_bill_types[bill_type_orig].add( "%s-%s" % ( collection, volume ) )
 
-							bill_type = "ammem-%s-%s-%s" % ( code, volume, bill_type_orig.lower().replace( '.', '' ).replace( ' ', '' ) )
+							bill_type = "ammem-%s-%s-%s" % ( collection, volume, bill_type_orig.lower().replace( '.', '' ).replace( ' ', '' ) )
 
 					bill_id = "%s%s-%s" % ( bill_type, bill_number, congress )
 
-					bill_description = image[9]
+					bill_description = image["description"]
 
 					committees = []
 
 					try:
-						committee_names = image[10]
+						committee_names = image["committees"]
 					except IndexError:
 						# Some entries don't have a committee field, so we'll have to fudge it.
 						committee_names = ""
@@ -158,7 +156,7 @@ for code in codes:
 
 							committees.append( committee_info )
 
-					bill_dates = image[8].split( "," )
+					bill_dates = image["dates"].split( "," )
 
 					actions = []
 
@@ -178,7 +176,7 @@ for code in codes:
 
 					if bill_date is None:
 						# Certain dates have typos (like invalid values for month or day, or extra digits).
-						print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, code, volume, congress, session, bill_dates[-1] )
+						print "Bill %s in collection %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, collection, volume, congress, session, bill_dates[-1] )
 
 					# If this is a secondary page or another resource about the same bill, append the data to the existing entry.
 					if ( congress in bills ) and ( bill_type in bills[congress] ) and ( bill_id in bills[congress][bill_type] ):
@@ -198,14 +196,14 @@ for code in codes:
 
 					# Check for orphaned pages.
 					if page_no != 1:
-						print "Page %d of bill %s in %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, code, volume, congress, session )
+						print "Page %d of bill %s in collection %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, collection, volume, congress, session )
 						orphaned_pages.append( bill_id )
 
 					sources = []
 
 					source = {
 						"source": "ammem",
-						"code": code,
+						"collection": collection,
 						"volume": volume,
 						"source_url": ampage_url,
 					}
@@ -243,10 +241,10 @@ for code in codes:
 						bills[congress][bill_type] = {}
 
 					bills[congress][bill_type][bill_id] = bill
-			except csv.Error as e:
-				# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
-				print "Error parsing %s, volume %s: %s" % ( code, volume, e )
-				continue
+		except IOError as e:
+			# XXX: If the JSON file doesn't exist, ignore this volume and move on.
+			print "Error parsing collection %s, volume %s: %s" % ( collection, volume, e )
+			continue
 
 for congress in bills:
 	for bill_type in bills[congress]:
@@ -266,7 +264,8 @@ for congress in bills:
 			bill_path = "%s/data.json" % ( bill_dir )
 
 			print "Writing %s..." % ( bill_path )
-			open( bill_path, "w" ).write( json.dumps( bill, indent=2, ensure_ascii=False ) )
+			with open(bill_path, "w") as json_file:
+				json.dump( bill, json_file, indent=2, separators=(',', ': '), sort_keys=True )
 
 # XXX
 print "All Bill Types:", bill_no_types
