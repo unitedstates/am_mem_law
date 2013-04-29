@@ -118,13 +118,23 @@ for collection in collections:
 						bill_number = main_resource_number
 					else:
 						bill_type_orig = bill_no_matches.group( 1 )
-						bill_number = bill_no_matches.group( 2 ).replace( " 1/2", ".5" ) # XXX: Some bills have been assigned fractional numbers.
+						bill_number = bill_no_matches.group( 2 )
+
+						# Handle fractional, recycled, or unusual bill numbers.
+						try:
+							bad_bill_number = False
+
+							bill_number = int( float( bill_number.replace( " 1/2", ".5" ) ) * 10 )
+							bill_number = str( ( int( image["session"] ) * 100000 ) + bill_number )
+						except:
+							print "Unexpected bill number in %s, volume %s (%s-%s): %s" % ( collection, volume, congress, session, bill_no )
+							bad_bill_number = True
 
 						# XXX
 						bill_no_types.add( bill_type_orig )
 
 						# If we don't recognize the bill type provided, create a special bill type that we'll know to check later.
-						if bill_type_orig in bill_types:
+						if (bill_type_orig in bill_types) and (not bad_bill_number):
 							bill_type = bill_types[bill_type_orig]
 						else:
 							# XXX
@@ -185,8 +195,6 @@ for collection in collections:
 							bills[congress][bill_type][bill_id]["actions"].extend( actions )
 							bills[congress][bill_type][bill_id]["committees"].extend( committees )
 
-						bills[congress][bill_type][bill_id]["metadata"].append( image )
-
 						if main_resource_number not in bills[congress][bill_type][bill_id]["urls"]:
 							bills[congress][bill_type][bill_id]["urls"][main_resource_number] = {}
 
@@ -211,13 +219,12 @@ for collection in collections:
 					sources.append( source )
 
 					bill = {
-						"metadata": [ image ], # The original metadata, before parsing.
-
 						"bill_id": bill_id,
 						"bill_type": bill_type,
 						"number": bill_number,
 						"congress": congress,
 
+						"original_bill_number": bill_no,
 						"session": session,
 						"chamber": chamber,
 
