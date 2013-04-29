@@ -22,9 +22,14 @@ update = options.get("update", False)
 source = options.get("source", "json")
 clobber = options.get("clobber", (source == "txt"))
 collections = options.get("collections", "llhb,llsb,llsr").split(",")
+volume = options.get("volume", None)
 
 if source not in [ "json", "csv", "txt" ]:
 	# XXX: Issue an error about an unsupported source type.
+	raise
+
+if volume and (len(collections) > 1):
+	# XXX: Issue an error about too many collections.
 	raise
 
 if clobber:
@@ -43,7 +48,8 @@ fields = {
 
 for collection in collections:
 	collection_dir = LL_PATH + collection
-	for volume in os.listdir( collection_dir ):
+	volumes = [ volume ] if volume else os.listdir( collection_dir )
+	for volume in volumes:
 		metadata_path = "%s/%s/" % ( collection_dir, volume )
 		metadata_filename = "%s%s" % ( collection, volume )
 		txt_path = "%s%s.txt" % ( metadata_path, metadata_filename )
@@ -63,9 +69,7 @@ for collection in collections:
 						row[fields[collection][i]] = line[i].decode("cp850").encode("utf-8") if (i < len(line)) else ""
 					original_metadata.append(row)
 			except csv.Error as e:
-				# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
 				print "Error parsing text file for collection %s, volume %s: %s" % ( collection, volume, e )
-				continue
 
 		metadata = original_metadata
 
@@ -91,9 +95,7 @@ for collection in collections:
 								row[fields[collection][i]] = line[i]
 							metadata.append(row)
 					except csv.Error as e:
-						# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
 						print "Error parsing CSV file for collection %s, volume %s: %s" % ( collection, volume, e )
-						continue
 			except IOError:
 				pass
 
