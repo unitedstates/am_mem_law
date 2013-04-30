@@ -22,13 +22,13 @@ update = options.get("update", False)
 source = options.get("source", "json")
 clobber = options.get("clobber", (source == "txt"))
 collections = options.get("collections", "llhb,llsb,llsr").split(",")
-volume = options.get("volume", None)
+single_volume = options.get("volume", None)
 
 if source not in [ "json", "csv", "txt" ]:
 	# XXX: Issue an error about an unsupported source type.
 	raise
 
-if volume and (len(collections) > 1):
+if single_volume and (len(collections) > 1):
 	# XXX: Issue an error about too many collections.
 	raise
 
@@ -48,7 +48,7 @@ fields = {
 
 for collection in collections:
 	collection_dir = LL_PATH + collection
-	volumes = [ volume ] if volume else os.listdir( collection_dir )
+	volumes = [ single_volume ] if single_volume else os.listdir( collection_dir )
 	for volume in volumes:
 		metadata_path = "%s/%s/" % ( collection_dir, volume )
 		metadata_filename = "%s%s" % ( collection, volume )
