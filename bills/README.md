@@ -48,7 +48,7 @@ This script outputs files for each bill in the metadata, using a format compatib
 
 It takes a single optional argument to specify a different location for the source data. By default, the script uses the data in the location used by this project.
 
-Files are output to `data/congresses/[congress]/'.
+Files are output to `data/congresses/[congress]/`.
 
 #### Bill Numbering ####
 
