@@ -108,7 +108,7 @@ for collection in collections:
 				for line in metadata:
 					row = []
 					for field in fields[collection]:
-						row.append(line[field].encode("utf-8"))
+						row.append(line[field])
 					csv_writer.writerow(row)
 			except csv.Error as e:
 				# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
