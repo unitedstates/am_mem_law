@@ -40,7 +40,7 @@ But if you do need to run it, it takes the following parameters:
 * `--collections=llhb,llsb,llsr`: Only run the script on the specified comma-separated list of collections. The default value is `llhb,llsb,llsr`; be sure that you only specify collections that exist.
 * `--volume=030`: Only run the script on a single volume. Requires `--collections` to only specify a single collection.
 
-Files are output to `data/collecctions/[collection]/[volume]/`.
+Files are output to `data/collections/[collection]/[volume]/`.
 
 ### `bills.py` ###
 
