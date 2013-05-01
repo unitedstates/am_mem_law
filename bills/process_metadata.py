@@ -64,6 +64,10 @@ for collection in collections:
 			txt_reader = unicodecsv.reader(txt_file, encoding="cp850")
 			try:
 				for line in txt_reader:
+					# Blank line.
+					if len(line) == 0:
+						continue
+
 					row = {}
 					for i in range(len(fields[collection])):
 						field, separator = fields[collection][i]
@@ -95,6 +99,10 @@ for collection in collections:
 					csv_reader = unicodecsv.reader(csv_file)
 					try:
 						for line in csv_reader:
+							# Blank line.
+							if len(line) == 0:
+								continue
+
 							row = {}
 							for i in range(len(fields[collection])):
 								field, separator = fields[collection][i]
