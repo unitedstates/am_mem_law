@@ -107,7 +107,8 @@ for collection in collections:
 					if chamber != chambers[collection]:
 						raise ValueError( "Unexpected chamber" )
 
-					bill_no = image["bill_number"].strip()
+					# XXX: Ensure the few resources that are associated with multiple bills fail to parse as a valid bill.
+					bill_no = ",".join(image["bill_numbers"])
 
 					bill_no_matches = bill_no_pattern.search( bill_no )
 
@@ -149,24 +150,18 @@ for collection in collections:
 					bill_description = image["description"]
 
 					committees = []
+					committee_names = image["committees"]
 
-					try:
-						committee_names = image["committees"]
-					except IndexError:
-						# Some entries don't have a committee field, so we'll have to fudge it.
-						committee_names = ""
+					for committee in committee_names:
+						committee_info = {
+							"committee": committee,
+							"activity": [], # XXX
+							"committee_id": None, # XXX
+						}
 
-					for committee in committee_names.split( "~" ):
-						if committee != "":
-							committee_info = {
-								"committee": committee,
-								"activity": [], # XXX
-								"committee_id": None, # XXX
-							}
+						committees.append( committee_info )
 
-							committees.append( committee_info )
-
-					bill_dates = image["dates"].split( "," )
+					bill_dates = image["dates"]
 
 					actions = []
 
@@ -177,7 +172,8 @@ for collection in collections:
 							"text": bill_description,
 						}
 
-						if committee_names != "":
+						# If there are no committees associated with the resource, it's probably a secondary page.
+						if (page_no == 1) or (committee_names != []):
 							action["committee"] = committee_names
 
 						actions.append( action )
@@ -191,7 +187,7 @@ for collection in collections:
 					# If this is a secondary page or another resource about the same bill, append the data to the existing entry.
 					if ( congress in bills ) and ( bill_type in bills[congress] ) and ( bill_id in bills[congress][bill_type] ):
 						# If this contains new information about the bill, extract it.
-						if ( page_no == 1 ) or ( ( page_no != 1 ) and ( ( bill_description != "" ) or ( committee_names != "" ) ) ):
+						if ( page_no == 1 ) or ( ( page_no != 1 ) and ( ( bill_description != "" ) or ( committee_names != [] ) ) ):
 							bills[congress][bill_type][bill_id]["actions"].extend( actions )
 							bills[congress][bill_type][bill_id]["committees"].extend( committees )
 

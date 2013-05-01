@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys, os
-import csv, json
+import unicodecsv, json
 
 options = {}
 
@@ -41,9 +41,9 @@ if update:
 	pass
 
 fields = {
-	"llhb": [ "collection", "volume", "tiff_filename", "congress", "session", "chamber", "page", "bill_number", "dates", "description", "committees" ],
-	"llsb": [ "collection", "volume", "tiff_filename", "congress", "session", "chamber", "page", "bill_number", "dates", "description", "committees" ],
-	"llsr": [ "collection", "volume", "tiff_filename", "congress", "session", "chamber", "page", "bill_number", "dates", "description", "committees" ],
+	"llhb": [ ( "collection", None ), ( "volume", None ), ( "tiff_filename", None ), ( "congress", None ), ( "session", None ), ( "chamber", None ), ( "page", None ), ( "bill_numbers", "," ), ( "dates", "," ), ( "description", None ), ( "committees", "~" ) ],
+	"llsb": [ ( "collection", None ), ( "volume", None ), ( "tiff_filename", None ), ( "congress", None ), ( "session", None ), ( "chamber", None ), ( "page", None ), ( "bill_numbers", "," ), ( "dates", "," ), ( "description", None ), ( "committees", "~" ) ],
+	"llsr": [ ( "collection", None ), ( "volume", None ), ( "tiff_filename", None ), ( "congress", None ), ( "session", None ), ( "chamber", None ), ( "page", None ), ( "bill_numbers", "," ), ( "dates", "," ), ( "description", None ), ( "committees", "~" ) ],
 }
 
 for collection in collections:
@@ -60,15 +60,20 @@ for collection in collections:
 			print "Parsing text file for collection %s, volume %s..." % ( collection, volume )
 
 			original_metadata = []
-			txt_reader = csv.reader(txt_file)
+			# The American Memory metadata files are in an encoding similar or equal to IBM Code Page 850.
+			txt_reader = unicodecsv.reader(txt_file, encoding="cp850")
 			try:
 				for line in txt_reader:
 					row = {}
 					for i in range(len(fields[collection])):
-						# The American Memory metadata files are in an encoding similar or equal to IBM Code Page 850.
-						row[fields[collection][i]] = line[i].decode("cp850").encode("utf-8") if (i < len(line)) else ""
+						field, separator = fields[collection][i]
+
+						row[field] = line[i] if (i < len(line)) else ""
+
+						if separator:
+							row[field] = row[field].split(separator)
 					original_metadata.append(row)
-			except csv.Error as e:
+			except unicodecsv.Error as e:
 				print "Error parsing text file for collection %s, volume %s: %s" % ( collection, volume, e )
 
 		metadata = original_metadata
@@ -87,14 +92,16 @@ for collection in collections:
 					print "Parsing CSV file for collection %s, volume %s..." % ( collection, volume )
 
 					metadata = []
-					csv_reader = csv.reader(csv_file)
+					csv_reader = unicodecsv.reader(csv_file)
 					try:
 						for line in csv_reader:
 							row = {}
 							for i in range(len(fields[collection])):
-								row[fields[collection][i]] = line[i]
+								field, separator = fields[collection][i]
+
+								row[field] = ( [] if ( line[i] == "" ) else line[i].split(separator) ) if separator else line[i]
 							metadata.append(row)
-					except csv.Error as e:
+					except unicodecsv.Error as e:
 						print "Error parsing CSV file for collection %s, volume %s: %s" % ( collection, volume, e )
 			except IOError:
 				pass
@@ -103,13 +110,16 @@ for collection in collections:
 			json.dump(metadata, json_file, indent=2, separators=(',', ': '), sort_keys=True)
 
 		with open(csv_path, "w") as csv_file:
-			csv_writer = csv.writer(csv_file, quoting=csv.QUOTE_ALL)
+			csv_writer = unicodecsv.writer(csv_file, quoting=unicodecsv.QUOTE_ALL)
 			try:
 				for line in metadata:
 					row = []
-					for field in fields[collection]:
+					for ( field, separator ) in fields[collection]:
+						if separator:
+							line[field] = separator.join(line[field])
+
 						row.append(line[field])
 					csv_writer.writerow(row)
-			except csv.Error as e:
+			except unicodecsv.Error as e:
 				# XXX: The CSV chokes on quoted values with newline characters (possibly \r\n)
 				print "Error writing CSV file for collection %s, volume %s: %s" % ( collection, volume, e )
