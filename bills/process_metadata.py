@@ -68,7 +68,7 @@ for collection in collections:
 					for i in range(len(fields[collection])):
 						field, separator = fields[collection][i]
 
-						row[field] = line[i] if (i < len(line)) else ""
+						row[field] = line[i].strip() if (i < len(line)) else ""
 
 						if separator:
 							row[field] = row[field].split(separator)
@@ -99,6 +99,7 @@ for collection in collections:
 							for i in range(len(fields[collection])):
 								field, separator = fields[collection][i]
 
+								line[i] = line[i].strip()
 								row[field] = ( [] if ( line[i] == "" ) else line[i].split(separator) ) if separator else line[i]
 							metadata.append(row)
 					except unicodecsv.Error as e:
