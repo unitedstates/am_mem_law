@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys, os
+import re
 import unicodecsv, json
 
 options = {}
@@ -41,9 +42,9 @@ if update:
 	pass
 
 fields = {
-	"llhb": [ ( "collection", None ), ( "volume", None ), ( "tiff_filename", None ), ( "congress", None ), ( "session", None ), ( "chamber", None ), ( "page", None ), ( "bill_numbers", "," ), ( "dates", "," ), ( "description", None ), ( "committees", "~" ) ],
-	"llsb": [ ( "collection", None ), ( "volume", None ), ( "tiff_filename", None ), ( "congress", None ), ( "session", None ), ( "chamber", None ), ( "page", None ), ( "bill_numbers", "," ), ( "dates", "," ), ( "description", None ), ( "committees", "~" ) ],
-	"llsr": [ ( "collection", None ), ( "volume", None ), ( "tiff_filename", None ), ( "congress", None ), ( "session", None ), ( "chamber", None ), ( "page", None ), ( "bill_numbers", "," ), ( "dates", "," ), ( "description", None ), ( "committees", "~" ) ],
+	"llhb": [ ( "collection", None, r"llhb" ), ( "volume", None, r"[0-9]{3}" ), ( "tiff_filename", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
+	"llsb": [ ( "collection", None, r"llsb" ), ( "volume", None, r"[0-9]{3}" ), ( "tiff_filename", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
+	"llsr": [ ( "collection", None, r"llsr" ), ( "volume", None, r"[0-9]{3}" ), ( "tiff_filename", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
 }
 
 for collection in collections:
@@ -59,26 +60,50 @@ for collection in collections:
 		with open(txt_path) as txt_file:
 			print "Parsing text file for collection %s, volume %s..." % ( collection, volume )
 
+			regexp_pieces = []
+
+			# Because of issues with unescaped quotes, we can't use a normal CSV parser.
+			# Instead, we construct a regular expression based on the expected values of each field.
+			for field_data in fields[collection]:
+				field, separator, data_pattern = field_data
+
+				if separator:
+					field_pattern = r'(' + data_pattern + r"(?:" + separator + data_pattern + r')*)'
+				else:
+					field_pattern = r'(' + data_pattern + r')'
+
+				regexp_pieces.append(r'"(?:' + field_pattern + r'|)"')
+
+			regexp = re.compile(",".join(regexp_pieces))
+
 			original_metadata = []
-			# The American Memory metadata files are in an encoding similar or equal to IBM Code Page 850.
-			txt_reader = unicodecsv.reader(txt_file, encoding="cp850")
-			try:
-				for line in txt_reader:
-					# Blank line.
-					if len(line) == 0:
-						continue
 
+			for line in txt_file:
+				# Ignore blank lines.
+				if line.strip() == "":
+					continue
+
+				line_matches = regexp.match(line)
+				if line_matches:
 					row = {}
-					for i in range(len(fields[collection])):
-						field, separator = fields[collection][i]
 
-						row[field] = line[i].strip() if (i < len(line)) else ""
+					match_groups = line_matches.groups()
+					for i in range(len(match_groups)):
+						field, separator, _ = fields[collection][i]
 
-						if separator:
-							row[field] = row[field].split(separator)
+						if match_groups[i] is not None:
+							# The American Memory metadata files are in an encoding similar or equal to IBM Code Page 850.
+							row[field] = match_groups[i].decode("cp850").strip()
+
+							if separator:
+								row[field] = row[field].split(separator) if row[field] != "" else []
+						else:
+							row[field] = [] if separator else ""
+
 					original_metadata.append(row)
-			except unicodecsv.Error as e:
-				print "Error parsing text file for collection %s, volume %s: %s" % ( collection, volume, e )
+				else:
+					# XXX
+					print line
 
 		metadata = original_metadata
 
@@ -105,7 +130,7 @@ for collection in collections:
 
 							row = {}
 							for i in range(len(fields[collection])):
-								field, separator = fields[collection][i]
+								field, separator, _ = fields[collection][i]
 
 								if (i < len(line)):
 									line.append( "" )
@@ -126,7 +151,7 @@ for collection in collections:
 			try:
 				for line in metadata:
 					row = []
-					for ( field, separator ) in fields[collection]:
+					for ( field, separator, _ ) in fields[collection]:
 						if separator:
 							line[field] = separator.join(line[field])
 
