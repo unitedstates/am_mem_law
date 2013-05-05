@@ -107,6 +107,9 @@ for collection in collections:
 							for i in range(len(fields[collection])):
 								field, separator = fields[collection][i]
 
+								if (i < len(line)):
+									line.append( "" )
+
 								line[i] = line[i].strip()
 								row[field] = ( [] if ( line[i] == "" ) else line[i].split(separator) ) if separator else line[i]
 							metadata.append(row)
