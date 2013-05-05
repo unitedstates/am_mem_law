@@ -15,6 +15,11 @@ LL_PATH = sys.argv[1] if len(sys.argv) > 1 else "./data/collections/"
 
 ###
 
+# Path to congresses metadata.
+CONGRESSES_PATH = "./data/congresses/"
+
+###
+
 def format_bill_date( bill_date_orig ):
 #	try:
 #		# Most dates are of a Ymd format.
@@ -58,6 +63,7 @@ bill_types = {
 }
 
 bills = {}
+congress_committees = {}
 
 # XXX
 bill_no_types = set()
@@ -100,8 +106,8 @@ for collection in collections:
 						"gif": image_path_template % ( collection, volume, resource_number_set, image_name, "gif" ),
 					}
 
-					congress = str( int( image["congress"] ) )
-					session = str( int( image["session"] ) )
+					congress = int( image["congress"] )
+					session = int( image["session"] )
 					chamber = image["chamber"]
 
 					if chamber != chambers[collection]:
@@ -114,7 +120,7 @@ for collection in collections:
 
 					# The bill number provided doesn't match the expected format, so we have to ensure we use a unique one.
 					if bill_no_matches is None:
-						print "Unexpected bill number in %s, volume %s (%s-%s): %s" % ( collection, volume, congress, session, bill_no )
+						print "Unexpected bill number in %s, volume %s (%d-%d): %s" % ( collection, volume, congress, session, bill_no )
 						bill_type = "ammem-%s-%s-unk" % ( collection, volume )
 						bill_number = main_resource_number
 					else:
@@ -126,9 +132,9 @@ for collection in collections:
 							bad_bill_number = False
 
 							bill_number = int( float( bill_number.replace( " 1/2", ".5" ) ) * 10 )
-							bill_number = str( ( int( image["session"] ) * 100000 ) + bill_number )
+							bill_number = str( ( session * 100000 ) + bill_number )
 						except:
-							print "Unexpected bill number in %s, volume %s (%s-%s): %s" % ( collection, volume, congress, session, bill_no )
+							print "Unexpected bill number in %s, volume %s (%d-%d): %s" % ( collection, volume, congress, session, bill_no )
 							bad_bill_number = True
 
 						# XXX
@@ -145,7 +151,7 @@ for collection in collections:
 
 							bill_type = "ammem-%s-%s-%s" % ( collection, volume, bill_type_orig.lower().replace( '.', '' ).replace( ' ', '' ) )
 
-					bill_id = "%s%s-%s" % ( bill_type, bill_number, congress )
+					bill_id = "%s%s-%d" % ( bill_type, bill_number, congress )
 
 					bill_description = image["description"]
 
@@ -153,6 +159,14 @@ for collection in collections:
 					committee_names = image["committees"]
 
 					for committee in committee_names:
+						if chamber not in congress_committees:
+							congress_committees[chamber] = {}
+
+						if committee not in congress_committees[chamber]:
+							congress_committees[chamber][committee] = set()
+
+						congress_committees[chamber][committee].add(congress)
+
 						committee_info = {
 							"committee": committee,
 							"activity": [], # XXX
@@ -182,7 +196,7 @@ for collection in collections:
 
 					if bill_date is None:
 						# Certain dates have typos (like invalid values for month or day, or extra digits).
-						print "Bill %s in collection %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, collection, volume, congress, session, bill_dates[-1] )
+						print "Bill %s in collection %s, volume %s (%d-%d) has an invalid date: %s" % ( bill_no, collection, volume, congress, session, bill_dates[-1] )
 
 					# If this is a secondary page or another resource about the same bill, append the data to the existing entry.
 					if ( congress in bills ) and ( bill_type in bills[congress] ) and ( bill_id in bills[congress][bill_type] ):
@@ -200,7 +214,7 @@ for collection in collections:
 
 					# Check for orphaned pages.
 					if page_no != 1:
-						print "Page %d of bill %s in collection %s, volume %s (%s-%s) has extra information!" % ( page_no, bill_no, collection, volume, congress, session )
+						print "Page %d of bill %s in collection %s, volume %s (%d-%d) has extra information!" % ( page_no, bill_no, collection, volume, congress, session )
 						orphaned_pages.append( bill_id )
 
 					sources = []
@@ -218,10 +232,10 @@ for collection in collections:
 						"bill_id": bill_id,
 						"bill_type": bill_type,
 						"number": bill_number,
-						"congress": congress,
+						"congress": str( congress ),
 
 						"original_bill_number": bill_no,
-						"session": session,
+						"session": str( session ),
 						"chamber": chamber,
 
 						"actions": actions,
@@ -249,6 +263,9 @@ for collection in collections:
 			print "Error parsing collection %s, volume %s: %s" % ( collection, volume, e )
 			continue
 
+with open("%s/committees.json" % ( CONGRESSES_PATH ), "w") as json_file:
+	json.dump( congress_committees, json_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
+
 for congress in bills:
 	for bill_type in bills[congress]:
 		for bill_id in bills[congress][bill_type]:
@@ -256,7 +273,7 @@ for congress in bills:
 
 			# XXX: congress.utils.write()
 
-			bill_dir = "%s/%s/bills/%s/%s%s" % ( "data/congresses", congress, bill_type, bill_type, bill["number"] ) # XXX: congress.utils.data_dir()
+			bill_dir = "%s/%d/bills/%s/%s%s" % ( CONGRESSES_PATH, congress, bill_type, bill_type, bill["number"] ) # XXX: congress.utils.data_dir()
 
 			try:
 				os.makedirs( bill_dir )
