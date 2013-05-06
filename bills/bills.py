@@ -11,7 +11,14 @@ from pytz import timezone
 ###
 
 # Path to LL metadata.
-LL_PATH = sys.argv[1] if len(sys.argv) > 1 else "./data/collections"
+LL_PATH = "./data/collections"
+
+for arg in sys.argv[1:]:
+	if not arg.startswith("--"):
+		LL_PATH = arg
+		break
+
+verbose = "--verbose" in sys.argv
 
 ###
 
@@ -21,21 +28,6 @@ CONGRESSES_PATH = "./data/congresses"
 ###
 
 def format_bill_date( bill_date_orig ):
-#	try:
-#		# Most dates are of a Ymd format.
-#		bill_date = datetime.datetime.strptime( bill_date_orig, "%Y%m%d" )
-#	except ValueError:
-#		try:
-#			# Sometimes a bill doesn't specify a day, so it's encoded as '00'.
-#			bill_date = datetime.datetime.strptime( bill_date_orig, "%Y%m00" )
-#		except ValueError:
-#			# Certain dates have typos (like invalid values for month or day, or extra digits).
-#			print "Bill %s in %s, volume %s (%s-%s) has an invalid date: %s" % ( bill_no, collection, volume, congress, session, bill_dates[0] )
-#			continue
-#
-#	# For some reason, datetime doesn't support years < 1900.
-#	return ( "%04d-%02d-%02d" % ( bill_date.year, bill_date.month, bill_date.day ) )
-
 	bill_date_matches = re.search( "^([0-9]{4})([0-9]{2})([0-9]{2})$", bill_date_orig )
 
 	if bill_date_matches is None:
@@ -72,13 +64,16 @@ orphaned_pages = []
 
 bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$" )
 
+print "Parsing bill collection files..."
+
 for collection in collections:
 	collection_dir = "%s/%s" % ( LL_PATH, collection )
 	large_volumes = set()
 	for volume in os.listdir( collection_dir ):
 		try:
 			with open( "%s/%s/%s%s.json" % ( collection_dir, volume, collection, volume ) ) as json_file:
-				print "Parsing JSON file for collection %s, volume %s..." % ( collection, volume )
+				if verbose:
+					print "Parsing JSON file for collection %s, volume %s..." % ( collection, volume )
 
 				metadata = json.load(json_file)
 				for image in metadata:
@@ -171,6 +166,13 @@ for collection in collections:
 
 					bill_description = image["description"]
 
+					bill_title_match = re.search( "(?:An Act|A Bill),? (.+\.)$", bill_description )
+
+					if bill_title_match:
+						bill_title = bill_title_match.group(1)
+					else:
+						bill_title = None
+
 					committees = []
 					committee_names = image["committees"]
 
@@ -230,7 +232,7 @@ for collection in collections:
 
 					# Check for orphaned pages.
 					if page_no != 1:
-						print "Page %d of bill %s in collection %s, volume %s (%d-%d) has extra information!" % ( page_no, bill_no, collection, volume, congress, session )
+						print "Page %d of bill %s in collection %s, volume %s (%d-%d) is probably an orphan." % ( page_no, bill_no, collection, volume, congress, session )
 						orphaned_pages.append( bill_id )
 
 					sources = []
@@ -255,7 +257,11 @@ for collection in collections:
 						"chamber": chamber,
 
 						"actions": actions,
+						"status": "REFERRED" if len(committees) > 1 else "INTRODUCED", # XXX: We could probably extract more of this information.
 						"status_at": bill_date,
+
+						"titles": [ { "type": "official", "as": "introduced", "title": bill_title } ] if bill_title else [],
+						"official_title": bill_title,
 
 						"description": bill_description,
 
@@ -279,8 +285,12 @@ for collection in collections:
 			print "Error parsing collection %s, volume %s: %s" % ( collection, volume, e )
 			continue
 
+print "Writing committees file..."
+
 with open("%s/committees.json" % ( CONGRESSES_PATH ), "w") as json_file:
 	json.dump( congress_committees, json_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
+
+print "Writing bill data files..."
 
 for congress in bills:
 	for bill_type in bills[congress]:
@@ -299,7 +309,9 @@ for congress in bills:
 
 			bill_path = "%s/data.json" % ( bill_dir )
 
-			print "Writing %s..." % ( bill_path )
+			if verbose:
+				print "Writing %s..." % ( bill_path )
+
 			with open(bill_path, "w") as json_file:
 				json.dump( bill, json_file, indent=2, separators=(',', ': '), sort_keys=True )
 
