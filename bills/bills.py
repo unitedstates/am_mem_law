@@ -226,6 +226,9 @@ for collection in collections:
 						if main_resource_number not in bills[congress][bill_type][bill_id]["urls"]:
 							bills[congress][bill_type][bill_id]["urls"][main_resource_number] = {}
 
+						if (page_no > 2) and ((page_no - 1) not in bills[congress][bill_type][bill_id]["urls"][main_resource_number]):
+							print "Bill %s in collection %s, volume %s (%d-%d) is probably misnumbered. (Page %d is missing.)" % ( bill_no, collection, volume, congress, session, (page_no - 1) )
+
 						bills[congress][bill_type][bill_id]["urls"][main_resource_number][page_no] = urls
 
 						continue
