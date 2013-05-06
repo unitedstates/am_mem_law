@@ -11,12 +11,12 @@ from pytz import timezone
 ###
 
 # Path to LL metadata.
-LL_PATH = sys.argv[1] if len(sys.argv) > 1 else "./data/collections/"
+LL_PATH = sys.argv[1] if len(sys.argv) > 1 else "./data/collections"
 
 ###
 
 # Path to congresses metadata.
-CONGRESSES_PATH = "./data/congresses/"
+CONGRESSES_PATH = "./data/congresses"
 
 ###
 
@@ -73,10 +73,11 @@ orphaned_pages = []
 bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$" )
 
 for collection in collections:
-	collection_dir = LL_PATH + collection
+	collection_dir = "%s/%s" % ( LL_PATH, collection )
+	large_volumes = set()
 	for volume in os.listdir( collection_dir ):
 		try:
-			with open( collection_dir + "/" + volume + "/" + collection + volume + ".json" ) as json_file:
+			with open( "%s/%s/%s%s.json" % ( collection_dir, volume, collection, volume ) ) as json_file:
 				print "Parsing JSON file for collection %s, volume %s..." % ( collection, volume )
 
 				metadata = json.load(json_file)
@@ -89,14 +90,29 @@ for collection in collections:
 
 					image_name = image["tiff_filename"][0:image["tiff_filename"].index( "." )]
 
-					resource_number = image_name[0:4]
 					resource_page = image_name[4:8]
 
-					resource_number_set = "%s00" % resource_number[0:2]
+					# Certain volumes have more than 10,000 resources.
+					# These use 5 digits for the resource number and 3 digits for the page number.
+					# We assume any resource with a "page number" greater than 1000 is one of these.
+					# But we also have to keep track of them, to handle resource numbers that end in zero.
+					if (volume in large_volumes) or (int( resource_page ) >= 1000):
+						large_volumes.add(volume)
+
+						resource_number = image_name[0:5]
+						resource_page = image_name[5:8]
+						resource_number_prefix = resource_number[0:3]
+						resource_number_pattern = "%05d"
+					else:
+						resource_number = image_name[0:4]
+						resource_number_prefix = resource_number[0:2]
+						resource_number_pattern = "%04d"
+
+					resource_number_set = "%s00" % resource_number_prefix
 
 					page_no = 1 if image["page"] == "" else int( image["page"] )
 
-					main_resource_number = "%04d" % ( int( resource_number ) - ( page_no - 1 ) )
+					main_resource_number = resource_number_pattern % ( int( resource_number ) - ( page_no - 1 ) )
 
 					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( collection, volume, collection, volume, ( int( resource_number ) - 1 ) )
 
