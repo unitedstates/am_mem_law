@@ -56,6 +56,7 @@ bill_types = {
 
 bills = {}
 congress_committees = {}
+calendar = {}
 
 # XXX
 bill_no_types = set()
@@ -123,6 +124,9 @@ for collection in collections:
 
 					if chamber != chambers[collection]:
 						raise ValueError( "Unexpected chamber" )
+
+					if congress not in calendar:
+						calendar[congress] = {}
 
 					# XXX: Ensure the few resources that are associated with multiple bills fail to parse as a valid bill.
 					bill_no = ",".join(image["bill_numbers"])
@@ -208,8 +212,10 @@ for collection in collections:
 
 					# Sometimes the bill has multiple dates associated with it, so we'll treat each as a separate action.
 					for bill_date in bill_dates:
+						bill_date = format_bill_date( bill_date )
+
 						action = {
-							"acted_at": format_bill_date( bill_date ),
+							"acted_at": bill_date,
 							"text": bill_description,
 						}
 
@@ -221,6 +227,21 @@ for collection in collections:
 							action["type"] = "action"
 
 						actions.append( action )
+
+						if ( action["text"] != "" ) or ( "committee" in action ):
+							if bill_date not in calendar[congress]:
+								calendar[congress][bill_date] = []
+
+							calendar_item = {
+								"source": "%s%s" % ( collection, volume ),
+								"session": session,
+								"chamber": chamber,
+								"original_bill_number": bill_no,
+								"bill_id": bill_id,
+								"action": action,
+							}
+
+							calendar[congress][bill_date].append( calendar_item )
 
 					bill_date = format_bill_date( bill_dates[-1] ) # XXX: congress.bill_info.latest_status()
 
@@ -302,8 +323,8 @@ for collection in collections:
 
 print "Writing committees file..."
 
-with open("%s/committees.json" % ( CONGRESSES_PATH ), "w") as json_file:
-	json.dump( congress_committees, json_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
+with open("%s/committees.json" % ( CONGRESSES_PATH ), "w") as commitees_file:
+	json.dump( congress_committees, commitees_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
 
 print "Writing bill data files..."
 
@@ -327,8 +348,14 @@ for congress in bills:
 			if verbose:
 				print "Writing %s..." % ( bill_path )
 
-			with open(bill_path, "w") as json_file:
-				json.dump( bill, json_file, indent=2, separators=(',', ': '), sort_keys=True )
+			with open(bill_path, "w") as bill_file:
+				json.dump( bill, bill_file, indent=2, separators=(',', ': '), sort_keys=True )
+
+print "Writing calendar files..."
+
+for congress in calendar:
+	with open("%s/%s/calendar.json" % ( CONGRESSES_PATH, congress ), "w") as calendar_file:
+		json.dump( calendar[congress], calendar_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
 
 # XXX
 print "All Bill Types:", bill_no_types
