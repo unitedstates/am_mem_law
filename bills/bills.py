@@ -166,13 +166,6 @@ for collection in collections:
 
 					bill_description = image["description"]
 
-					bill_title_match = re.search( "(?:An Act|A Bill),? (.+\.)$", bill_description )
-
-					if bill_title_match:
-						bill_title = bill_title_match.group(1)
-					else:
-						bill_title = None
-
 					committees = []
 					committee_names = image["committees"]
 
@@ -187,11 +180,27 @@ for collection in collections:
 
 						committee_info = {
 							"committee": committee,
-							"activity": [], # XXX
+							"activity": [ "referral" ], # XXX
 							"committee_id": None, # XXX
 						}
 
 						committees.append( committee_info )
+
+					bill_status = "INTRODUCED"
+					bill_title = None
+
+					bill_title_match = re.search( "(An Act|A Bill),? (.+\.)$", bill_description )
+
+					if bill_title_match:
+						if bill_title_match.group(1) == "An Act":
+							# If listed as an act, assume it has passed the other chamber.
+							bill_status = "PASS_OVER:HOUSE" if chamber == "s" else "PASS_OVER:SENATE"
+						elif re.search( "[Rr]eported", bill_description ):
+							bill_status = "REPORTED"
+						elif len(committees) > 0:
+							bill_status = "REFERRED"
+
+						bill_title = bill_title_match.group(2)
 
 					bill_dates = image["dates"]
 
@@ -204,9 +213,12 @@ for collection in collections:
 							"text": bill_description,
 						}
 
-						# If there are no committees associated with the resource, it's probably a secondary page.
-						if (page_no == 1) or (committee_names != []):
+						# If there are committees associated with the resource, it's probably a referral action.
+						if committee_names != []:
+							action["type"] = "referral"
 							action["committee"] = committee_names
+						else:
+							action["type"] = "action"
 
 						actions.append( action )
 
@@ -260,7 +272,7 @@ for collection in collections:
 						"chamber": chamber,
 
 						"actions": actions,
-						"status": "REFERRED" if len(committees) > 1 else "INTRODUCED", # XXX: We could probably extract more of this information.
+						"status": bill_status,
 						"status_at": bill_date,
 
 						"titles": [ { "type": "official", "as": "introduced", "title": bill_title } ] if bill_title else [],
