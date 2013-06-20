@@ -94,4 +94,16 @@ for fn in sorted(glob.glob("source/*")):
 			csv_writer.writerow(row)
 
 	with open("json/%s%03d.json" % (collection, volume), "w") as json_file:
-		json.dump(data, json_file, indent=2, separators=(',', ': '), sort_keys=True)
+		new_data = []
+		for line in data:
+			if line["page"] == "":
+				line["pages"] = [
+					{ "page": 1, "image": line["tiff_filename"] }
+				]
+				del line["page"]
+				del line["tiff_filename"]
+				new_data.append(line)
+			else:
+				new_data[-1]["pages"].append( { "page": int(line["page"]), "image": line["tiff_filename"] } )
+				
+		json.dump(new_data, json_file, indent=2, separators=(',', ': '), sort_keys=True)
