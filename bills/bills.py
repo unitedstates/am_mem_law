@@ -1,24 +1,13 @@
 #!/usr/bin/env python
 
-import sys, os
+# You'll need the Congress project's tasks directory to be on your path:
+# export PYTHONPATH=../congress/tasks
+
+import sys, os, glob
 import datetime, time
 import re
 import json
-
-# XXX: congress.utils.format_datetime()
-from pytz import timezone
-
-###
-
-# Path to LL metadata.
-LL_PATH = "./data/collections"
-
-for arg in sys.argv[1:]:
-	if not arg.startswith("--"):
-		LL_PATH = arg
-		break
-
-verbose = "--verbose" in sys.argv
+from utils import format_datetime
 
 ###
 
@@ -26,19 +15,6 @@ verbose = "--verbose" in sys.argv
 CONGRESSES_PATH = "./data/congresses"
 
 ###
-
-def format_bill_date( bill_date_orig ):
-	bill_date_matches = re.search( "^([0-9]{4})([0-9]{2})([0-9]{2})$", bill_date_orig )
-
-	if bill_date_matches is None:
-		return None
-
-	year = bill_date_matches.group( 1 )
-	month = bill_date_matches.group( 2 )
-	day = bill_date_matches.group( 3 )
-
-	return ( "%s-%s-%s" % ( year, month, day ) ) #( "%04d-%02d-%02d" % ( year, month, day ) )
-
 
 collections = [ "llhb", "llsb" ]
 image_path_template = "http://memory.loc.gov/ll/%s/%s/%s/%s.%s"
@@ -61,30 +37,21 @@ calendar = {}
 # XXX
 bill_no_types = set()
 unknown_bill_types = {}
-orphaned_pages = []
 
 bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$" )
 
 print "Parsing bill collection files..."
 
 for collection in collections:
-	collection_dir = "%s/%s" % ( LL_PATH, collection )
 	large_volumes = set()
-	for volume in os.listdir( collection_dir ):
-		try:
-			with open( "%s/%s/%s%s.json" % ( collection_dir, volume, collection, volume ) ) as json_file:
-				if verbose:
-					print "Parsing JSON file for collection %s, volume %s..." % ( collection, volume )
+	for volume_fn in glob.glob("json/" + collection + "*.json"):
+			with open(volume_fn) as json_file:
+				print volume_fn, "..."
 
 				metadata = json.load(json_file)
-				for image in metadata:
-					if image["collection"] != collection:
-						raise ValueError( "Unexpected collection" )
-
-					if image["volume"] != volume:
-						raise ValueError( "Unexpected volume" )
-
-					image_name = image["tiff_filename"][0:image["tiff_filename"].index( "." )]
+				for document in metadata:
+					tiff_filename = document['pages'][-1]["image"]
+					image_name = tiff_filename[0:tiff_filename.index( "." )]
 
 					resource_page = image_name[4:8]
 
@@ -92,8 +59,8 @@ for collection in collections:
 					# These use 5 digits for the resource number and 3 digits for the page number.
 					# We assume any resource with a "page number" greater than 1000 is one of these.
 					# But we also have to keep track of them, to handle resource numbers that end in zero.
-					if (volume in large_volumes) or (int( resource_page ) >= 1000):
-						large_volumes.add(volume)
+					if (volume_fn in large_volumes) or (int( resource_page ) >= 1000):
+						large_volumes.add(volume_fn)
 
 						resource_number = image_name[0:5]
 						resource_page = image_name[5:8]
@@ -106,37 +73,31 @@ for collection in collections:
 
 					resource_number_set = "%s00" % resource_number_prefix
 
-					page_no = 1 if image["page"] == "" else int( image["page"] )
-
-					main_resource_number = resource_number_pattern % ( int( resource_number ) - ( page_no - 1 ) )
-
-					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( collection, volume, collection, volume, ( int( resource_number ) - 1 ) )
+					main_resource_number = resource_number_pattern % int( resource_number )
+					
+					ampage_url = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%s/%s%s.db&recNum=%04d" % ( collection, document['volume'], collection, document['volume'], ( int( resource_number ) - 1 ) )
 
 					urls = {
 						"web": ampage_url,
-						"tiff": image_path_template % ( collection, volume, resource_number_set, image_name, "tif" ),
-						"gif": image_path_template % ( collection, volume, resource_number_set, image_name, "gif" ),
+						"tiff": image_path_template % ( document['collection'], document['volume'], resource_number_set, image_name, "tif" ),
+						"gif": image_path_template % ( document['collection'], document['volume'], resource_number_set, image_name, "gif" ),
 					}
 
-					congress = int( image["congress"] )
-					session = int( image["session"] )
-					chamber = image["chamber"]
-
-					if chamber != chambers[collection]:
+					if document['chamber'] != chambers[collection]:
 						raise ValueError( "Unexpected chamber" )
 
-					if congress not in calendar:
-						calendar[congress] = {}
+					if document['congress'] not in calendar:
+						calendar[document['congress']] = {}
 
 					# XXX: Ensure the few resources that are associated with multiple bills fail to parse as a valid bill.
-					bill_no = ",".join(image["bill_numbers"])
+					bill_no = ",".join(document["bill_numbers"])
 
 					bill_no_matches = bill_no_pattern.search( bill_no )
 
 					# The bill number provided doesn't match the expected format, so we have to ensure we use a unique one.
 					if bill_no_matches is None:
-						print "Unexpected bill number in %s, volume %s (%d-%d): %s" % ( collection, volume, congress, session, bill_no )
-						bill_type = "ammem-%s-%s-unk" % ( collection, volume )
+						print "Invalid bill number in %s, volume %s (%d-%d): %s" % ( document['collection'], document['volume'], document['congress'], document['session'], bill_no )
+						bill_type = "ammem-%s-%s-unk" % ( document['collection'], document['volume'] )
 						bill_number = main_resource_number
 					else:
 						bill_type_orig = bill_no_matches.group( 1 )
@@ -147,9 +108,9 @@ for collection in collections:
 							bad_bill_number = False
 
 							bill_number = int( float( bill_number.replace( " 1/2", ".5" ) ) * 10 )
-							bill_number = str( ( session * 100000 ) + bill_number )
+							bill_number = str( ( document['session'] * 100000 ) + bill_number )
 						except:
-							print "Unexpected bill number in %s, volume %s (%d-%d): %s" % ( collection, volume, congress, session, bill_no )
+							print "Unexpected bill number in %s, volume %s (%d-%d): %s" % ( document['collection'], document['volume'], document['congress'], document['session'], bill_no )
 							bad_bill_number = True
 
 						# XXX
@@ -162,25 +123,25 @@ for collection in collections:
 							# XXX
 							if bill_type_orig not in unknown_bill_types:
 								unknown_bill_types[bill_type_orig] = set()
-							unknown_bill_types[bill_type_orig].add( "%s-%s" % ( collection, volume ) )
+							unknown_bill_types[bill_type_orig].add( "%s-%s" % ( document['collection'], document['volume'] ) )
 
-							bill_type = "ammem-%s-%s-%s" % ( collection, volume, bill_type_orig.lower().replace( '.', '' ).replace( ' ', '' ) )
+							bill_type = "ammem-%s-%s-%s" % ( document['collection'], document['volume'], bill_type_orig.lower().replace( '.', '' ).replace( ' ', '' ) )
 
-					bill_id = "%s%s-%d" % ( bill_type, bill_number, congress )
+					bill_id = "%s%s-%d" % ( bill_type, bill_number, document['congress'] )
 
-					bill_description = image["description"]
+					bill_description = document["description"]
 
 					committees = []
-					committee_names = image["committees"]
+					committee_names = document["committees"]
 
 					for committee in committee_names:
-						if chamber not in congress_committees:
-							congress_committees[chamber] = {}
+						if document['chamber'] not in congress_committees:
+							congress_committees[document['chamber']] = {}
 
-						if committee not in congress_committees[chamber]:
-							congress_committees[chamber][committee] = set()
+						if committee not in congress_committees[document['chamber']]:
+							congress_committees[document['chamber']][committee] = set()
 
-						congress_committees[chamber][committee].add(congress)
+						congress_committees[document['chamber']][committee].add(document['congress'])
 
 						committee_info = {
 							"committee": committee,
@@ -198,7 +159,7 @@ for collection in collections:
 					if bill_title_match:
 						if bill_title_match.group(1) == "An Act":
 							# If listed as an act, assume it has passed the other chamber.
-							bill_status = "PASS_OVER:HOUSE" if chamber == "s" else "PASS_OVER:SENATE"
+							bill_status = "PASS_OVER:HOUSE" if document['chamber'] == "s" else "PASS_OVER:SENATE"
 						elif re.search( "[Rr]eported", bill_description ):
 							bill_status = "REPORTED"
 						elif len(committees) > 0:
@@ -206,14 +167,12 @@ for collection in collections:
 
 						bill_title = bill_title_match.group(2)
 
-					bill_dates = image["dates"]
+					bill_dates = document["dates"]
 
 					actions = []
 
 					# Sometimes the bill has multiple dates associated with it, so we'll treat each as a separate action.
 					for bill_date in bill_dates:
-						bill_date = format_bill_date( bill_date )
-
 						action = {
 							"acted_at": bill_date,
 							"text": bill_description,
@@ -229,72 +188,40 @@ for collection in collections:
 						actions.append( action )
 
 						if ( action["text"] != "" ) or ( "committee" in action ):
-							if bill_date not in calendar[congress]:
-								calendar[congress][bill_date] = []
+							if bill_date not in calendar[document['congress']]:
+								calendar[document['congress']][bill_date] = []
 
 							calendar_item = {
-								"source": "%s%s" % ( collection, volume ),
-								"session": session,
-								"chamber": chamber,
+								"source": "%s%s" % ( collection, document['volume'] ),
+								"session": document['session'],
+								"chamber": document['chamber'],
 								"original_bill_number": bill_no,
 								"bill_id": bill_id,
 								"action": action,
 							}
 
-							calendar[congress][bill_date].append( calendar_item )
+							calendar[document['congress']][bill_date].append( calendar_item )
 
-					bill_date = format_bill_date( bill_dates[-1] ) # XXX: congress.bill_info.latest_status()
-
-					if bill_date is None:
-						# Certain dates have typos (like invalid values for month or day, or extra digits).
-						print "Bill %s in collection %s, volume %s (%d-%d) has an invalid date: %s" % ( bill_no, collection, volume, congress, session, bill_dates[-1] )
-
-					# If this is a secondary page or another resource about the same bill, append the data to the existing entry.
-					if ( congress in bills ) and ( bill_type in bills[congress] ) and ( bill_id in bills[congress][bill_type] ):
-						# If this contains new information about the bill, extract it.
-						if ( page_no == 1 ) or ( ( page_no != 1 ) and ( ( bill_description != "" ) or ( committee_names != [] ) ) ):
-							bills[congress][bill_type][bill_id]["actions"].extend( actions )
-							bills[congress][bill_type][bill_id]["committees"].extend( committees )
-
-						if main_resource_number not in bills[congress][bill_type][bill_id]["urls"]:
-							bills[congress][bill_type][bill_id]["urls"][main_resource_number] = {}
-
-						if (page_no > 2) and ((page_no - 1) not in bills[congress][bill_type][bill_id]["urls"][main_resource_number]):
-							print "Bill %s in collection %s, volume %s (%d-%d) is probably misnumbered. (Page %d is missing.)" % ( bill_no, collection, volume, congress, session, (page_no - 1) )
-
-						bills[congress][bill_type][bill_id]["urls"][main_resource_number][page_no] = urls
-
-						continue
-
-					# Check for orphaned pages.
-					if page_no != 1:
-						print "Page %d of bill %s in collection %s, volume %s (%d-%d) is probably an orphan." % ( page_no, bill_no, collection, volume, congress, session )
-						orphaned_pages.append( bill_id )
-
-					sources = []
-
-					source = {
+					sources = [{
 						"source": "ammem",
 						"collection": collection,
-						"volume": volume,
+						"volume": document['volume'],
 						"source_url": ampage_url,
-					}
-
-					sources.append( source )
+					}]
 
 					bill = {
 						"bill_id": bill_id,
 						"bill_type": bill_type,
 						"number": bill_number,
-						"congress": str( congress ),
+						"congress": document['congress'],
 
 						"original_bill_number": bill_no,
-						"session": str( session ),
-						"chamber": chamber,
+						"session": document['session'],
+						"chamber": document['chamber'],
 
 						"actions": actions,
 						"status": bill_status,
-						"status_at": bill_date,
+						"status_at": format_datetime(document['dates'][-1]),
 
 						"titles": [ { "type": "official", "as": "introduced", "title": bill_title } ] if bill_title else [],
 						"official_title": bill_title,
@@ -304,26 +231,16 @@ for collection in collections:
 						"committees": committees,
 
 						"sources": sources,
-						"updated_at": timezone( "US/Eastern" ).localize( datetime.datetime.fromtimestamp( time.time() ).replace( microsecond=0 ) ).isoformat(), # XXX: congress.utils.format_datetime()
+						"updated_at": format_datetime(datetime.datetime.fromtimestamp(time.time())),
 
-						"urls": { main_resource_number: { page_no: urls } },
+						"urls": urls,
 					}
 
-					if congress not in bills:
-						bills[congress] = {}
-
-					if bill_type not in bills[congress]:
-						bills[congress][bill_type] = {}
-
-					bills[congress][bill_type][bill_id] = bill
-		except IOError as e:
-			# XXX: If the JSON file doesn't exist, ignore this volume and move on.
-			print "Error parsing collection %s, volume %s: %s" % ( collection, volume, e )
-			continue
+					bills.setdefault(document['congress'], {}).setdefault(bill_type, {})[bill_id] = bill
 
 print "Writing committees file..."
 
-with open("%s/committees.json" % ( CONGRESSES_PATH ), "w") as commitees_file:
+with open("committees.json", "w") as commitees_file:
 	json.dump( congress_committees, commitees_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
 
 print "Writing bill data files..."
@@ -345,9 +262,6 @@ for congress in bills:
 
 			bill_path = "%s/data.json" % ( bill_dir )
 
-			if verbose:
-				print "Writing %s..." % ( bill_path )
-
 			with open(bill_path, "w") as bill_file:
 				json.dump( bill, bill_file, indent=2, separators=(',', ': '), sort_keys=True )
 
@@ -360,4 +274,3 @@ for congress in calendar:
 # XXX
 print "All Bill Types:", bill_no_types
 print "Unrecognized Bill Types:", unknown_bill_types
-print "Bills with Orphaned Pages:", orphaned_pages

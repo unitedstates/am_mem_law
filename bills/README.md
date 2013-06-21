@@ -35,15 +35,14 @@ format, the pages of each document are grouped together, so the records of the J
 and the page information is stored in the 'pages' field inside each document.
 
 A document could be a bill or resolution, or an amendment to a bill or resolution, or perhaps other
-sorts of bill/resolution-related document.
+sorts of bill/resolution-related document. Some documents are somehow related to multiple bills.
+In the JSON, the bill_numbers field is an array.
 
 ### `bills.py` ###
 
 This script outputs files for each bill in the metadata, using a format compatible with output from the [unitedstates/congress](https://github.com/unitedstates/congress) project.
 
-It takes a single optional argument to specify a different location for the source data. By default, the script uses the data in the location used by this project.
-
-Files are output to `data/congresses/[congress]/`.
+Files are output to `data/congresses/[congress]/...`, similar to what the congress project does.
 
 #### Bill Numbering ####
 
