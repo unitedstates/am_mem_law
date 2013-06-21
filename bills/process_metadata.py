@@ -13,7 +13,7 @@
 # This script was written originally by Gordon Hemsley. Modified by
 # Joshua Tauberer.
 
-import glob, re, csv, json
+import glob, re, csv, json, datetime
 
 
 # Because of issues with unescaped quotes, we can't use a normal CSV parser.
@@ -40,6 +40,14 @@ for collection in fields:
 		regexp_pieces.append(r'"(?:' + field_pattern + r'|)"')
 
 	collection_regex[collection] = re.compile(",".join(regexp_pieces))
+	
+def parse_date(dd):
+	y, m, d = re.match(r"(\d\d\d\d)(\d\d)(\d\d)$", dd).groups()
+	try:
+		return datetime.date(int(y), int(m), int(d)).isoformat()
+	except ValueError:
+		print "Invalid date:", dd
+		return "%s-%s-%s" % (y, m, d)
 	
 # Process the files.
 
@@ -73,11 +81,20 @@ for fn in sorted(glob.glob("source/*")):
 
 				if match_groups[i] is not None:
 					# The source files are in an encoding similar or equal to IBM Code Page 850.
-					row[field] = match_groups[i].decode("cp850")
-					row[field] = row[field].strip()
-
+					value = match_groups[i].decode("cp850")
+					
+					value = value.strip()
+					
 					if separator:
-						row[field] = row[field].split(separator) if row[field] != "" else []
+						value = value.split(separator) if value != "" else []
+						
+						if field == "dates":
+							value = [parse_date(d) for d in value]
+						
+					if field in ("congress", "session", "volume") and value != "":
+						value = str(int(value))
+						
+					row[field] = value
 				else:
 					row[field] = [] if separator else ""
 
@@ -97,6 +114,12 @@ for fn in sorted(glob.glob("source/*")):
 		new_data = []
 		for line in data:
 			if line["page"] == "":
+				for field in ("congress", "session", "volume"):
+					if line[field] != "":
+						line[field] = int(line[field])
+					else:
+						line[field] = None
+				
 				line["pages"] = [
 					{ "page": 1, "image": line["tiff_filename"] }
 				]
