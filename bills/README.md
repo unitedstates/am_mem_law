@@ -3,44 +3,39 @@ American Memory
 
 Metadata for the Library of Congress's [American Memory](http://memory.loc.gov/ammem/amlaw/lawhome.html) site, curated and corrected for better sustainability and accessibility.
 
-Metadata Contents
------------------
+By Gordon Hemsley (@GPHemsley) and Joshua Tauberer (@tauberer).
+
+Collections
+-----------
 
 We are currently maintaining metadata for the following American Memory collections:
 
-* `llhb`: Bills in the House of Representatives (6th Congress-42nd Congress (1799-1873), excluding the 12th Congress)
-* `llsb`: Bills in the Senate (15th Congress-42nd Congress (1819-1873))
-* `llsr`: Senate Resolutions/Joint Resolutions (dates?)
+* `llhb`: Bills in the House of Representatives, 6th Congress-42nd Congress (1799-1873), excluding the 12th Congress
+* `llsb`: Bills in the Senate, 16th Congress-42nd Congress (1819-1873)
+* `llsr`: Senate Resolutions/Joint Resolutions, 18th Congress-42nd Congress (1823-1873), excluding the 20th and 24th Congresses
 
 For more information about these and other collections, see the [unitedstates/am_mem_law](https://github.com/unitedstates/am_mem_law) project.
 
-Metadata Format
----------------
+Data Format
+-----------
 
-Each volume in a collection has three associated files:
+Each collection is divided into a number of volumes. The volumes are apparently numbered according to the order
+in which the Library of Congress scanned the physical volumes, which was out of chronological order.
 
-* `[collection][volume].txt`: The original CSV-like file from the Library of Congress, preserved for posterity. This will only change if the upstream file changes.
-* `[collection][volume].json`: An updated and corrected JSON file for easy processing. This is probably the file you want to use if you want to use the data.
-* `[collection][volume].csv`: A mostly-backwards-compatible CSV file maintained for potential future upstreaming. The contents of this file should match the JSON file, so you can use it if you want.
+Each volume is stored in three files:
 
-Scripts
--------
+* source/[collection][volume].txt: The original data file from the American Memory collection, with select corrections. This file looks like CSV but it is hard to parse (see process_metadata.py).
+* csv/[collection][volume].csv: The same information converted into a UTF-8 encoded CSV file, with some field normalization.
+* json/[collection][volume].json: The same information coverted to JSON (see notes below).
 
-There are a couple of scripts that help to maintain and make use of the data.
+We use process_metadata.py to convert the original source file to CSV and JSON format.
 
-### `process_metadata.py` ###
+Each original metadata record represents a single physical page of a document printed in the record. In the JSON
+format, the pages of each document are grouped together, so the records of the JSON file are documents (not pages)
+and the page information is stored in the 'pages' field inside each document.
 
-This script is what helps to keep the data in sync when changes are made. You probably don't need to run this script in order to use the data.
-
-But if you do need to run it, it takes the following parameters:
-
-* `--update`: Download fresh copies of the original Library of Congress files. (This does not currently work.)
-* `--clobber`: Overwrite the JSON and CSV files using the data in the Library of Congress files. (This does not currently work.)
-* `--source=json|csv|txt`: Specifies which file to use as the source when regenerating the data files. The default value is `json`; a value of `txt` will also set `--clobber`.
-* `--collections=llhb,llsb,llsr`: Only run the script on the specified comma-separated list of collections. The default value is `llhb,llsb,llsr`; be sure that you only specify collections that exist.
-* `--volume=030`: Only run the script on a single volume. Requires `--collections` to only specify a single collection.
-
-Files are output to `data/collections/[collection]/[volume]/`.
+A document could be a bill or resolution, or an amendment to a bill or resolution, or perhaps other
+sorts of bill/resolution-related document.
 
 ### `bills.py` ###
 
