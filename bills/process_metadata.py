@@ -20,9 +20,9 @@ import glob, re, csv, json, datetime
 # Instead, we construct a regular expression based on the expected values of each field.
 
 fields = {
-	"llhb": [ ( "collection", None, r"llhb" ), ( "volume", None, r"[0-9]{3}" ), ( "tiff_filename", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
-	"llsb": [ ( "collection", None, r"llsb" ), ( "volume", None, r"[0-9]{3}" ), ( "tiff_filename", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
-	"llsr": [ ( "collection", None, r"llsr" ), ( "volume", None, r"[0-9]{3}" ), ( "tiff_filename", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
+	"llhb": [ ( "collection", None, r"llhb" ), ( "volume", None, r"[0-9]{3}" ), ( "image", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
+	"llsb": [ ( "collection", None, r"llsb" ), ( "volume", None, r"[0-9]{3}" ), ( "image", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
+	"llsr": [ ( "collection", None, r"llsr" ), ( "volume", None, r"[0-9]{3}" ), ( "image", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
 }
 	
 collection_regex = { }
@@ -94,7 +94,7 @@ for fn in sorted(glob.glob("source/*")):
 					if field in ("congress", "session", "volume") and value != "":
 						value = str(int(value))
 						
-					row[field] = value
+					row[field] = value					
 				else:
 					row[field] = [] if separator else ""
 
@@ -112,21 +112,46 @@ for fn in sorted(glob.glob("source/*")):
 
 	with open("json/%s%03d.json" % (collection, volume), "w") as json_file:
 		new_data = []
-		for line in data:
-			if line["page"] == "":
-				for field in ("congress", "session", "volume"):
-					if line[field] != "":
-						line[field] = int(line[field])
-					else:
-						line[field] = None
-				
-				line["pages"] = [
-					{ "page": 1, "image": line["tiff_filename"] }
-				]
-				del line["page"]
-				del line["tiff_filename"]
-				new_data.append(line)
+
+		for row in data:
+			# Also compute the URL to view the page on the American Memory website and to
+			# the direct links for the TIF and GIF images.
+			record_digits = 5 if (collection, volume) in ( ('llhb', 41), ('llhb', 42) ) else 4
+			row["record_number"] = int(row["image"][0:record_digits])
+			row["link"] = "http://memory.loc.gov/cgi-bin/ampage?collId=%s&fileName=%03d/%s%03d.db&recNum=%d" % (
+				collection,
+				volume,
+				collection,
+				volume,
+				row["record_number"] - 1,
+				)
+			row["large_image_url"] = "http://memory.loc.gov/ll/%s/%03d/%s/%s" % (
+				collection,
+				volume,
+				row["image"][0:record_digits-2] + "00",
+				row["image"],
+				)
+			row["small_image_url"] = row["large_image_url"].replace(".tif", ".gif")
+
+			# Normalize some values.
+			for field in ("congress", "session", "volume", "page"):
+				if row[field] != "":
+					row[field] = int(row[field])
+				else:
+					row[field] = None
+			
+			# Group the pages of documents together.
+			page_fields = ('page', 'image', 'link', 'large_image_url', 'small_image_url', 'record_number')
+			if row["page"] == None:
+				row["pages"] = [ { } ]
+				for f in page_fields:
+					row["pages"][0][f] = row[f]
+					del row[f]
+				new_data.append(row)
 			else:
-				new_data[-1]["pages"].append( { "page": int(line["page"]), "image": line["tiff_filename"] } )
+				new_data[-1]["pages"].append(dict(
+					(f, row[f]) for f in page_fields
+				))
 				
 		json.dump(new_data, json_file, indent=2, separators=(',', ': '), sort_keys=True)
+
