@@ -13,7 +13,7 @@
 # This script was written originally by Gordon Hemsley. Modified by
 # Joshua Tauberer.
 
-import glob, re, csv, json, datetime
+import glob, re, csv, json, datetime, os, os.path
 
 
 # Because of issues with unescaped quotes, we can't use a normal CSV parser.
@@ -50,6 +50,9 @@ def parse_date(dd):
 		return "%s-%s-%s" % (y, m, d)
 	
 # Process the files.
+
+if not os.path.exists("csv"): os.mkdir("csv")
+if not os.path.exists("json"): os.mkdir("json")
 
 for fn in sorted(glob.glob("source/*")):
 	print fn, "..."
