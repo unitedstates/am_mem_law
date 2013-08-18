@@ -15,7 +15,7 @@
 "llsb","027","00150002.tif","027","003","s","2","S. 1","18421208","",""
 "llsb","027","00160003.tif","027","003","s","3","S. 1","18421208","",""
 "llsb","027","00170004.tif","027","003","s","4","S. 1","18421208","",""
-"llsb","027","00180000.tif","027","002","s","","S. 1","18421313","Ordered to be printed. Amendment Proposed by Mr. Graham to the bill (S. 1) ''to repeal the bankrupt act,'' viz: Strike out all after the fifth line, and insert:",""
+"llsb","027","00180000.tif","027","002","s","","S. 1","18421213","Ordered to be printed. Amendment Proposed by Mr. Graham to the bill (S. 1) ''to repeal the bankrupt act,'' viz: Strike out all after the fifth line, and insert:",""
 "llsb","027","00190000.tif","027","001","s","","S. 2","18410610","Agreeably to notice, Mr. Clay, of Kentucky, asked and obtained leave to bring in the following bill; which was read, passed to a second reading, and ordered to be printed. A Bill To appropriate, for a limited time, the proceeds of the sales of the public lands of the United States, and for granting land to certain States.",""
 "llsb","027","00200002.tif","027","001","s","2","S. 2","18410610","",""
 "llsb","027","00210003.tif","027","001","s","3","S. 2","18410610","",""

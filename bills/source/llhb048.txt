@@ -727,7 +727,7 @@
 "llhb","048","07270002.tif","017","002","h","2","H.R. 207","18221227","",""
 "llhb","048","07280000.tif","017","002","h","","H.R. 208","18221231","Read twice, and committed to a committee of the whole House to-morrow. A Bill For the relief of the mother and unmarried sister of Lieutenant William H. Allen, deceased.","Committee of the Whole House"
 "llhb","048","07290002.tif","017","002","h","2","H.R. 208","18221231","",""
-"llhb","048","07300000.tif","017","002","h","","H.R. 209","18221331","Read twice, and committed to a committee of the whole House to-morrow. A Bill For the relief of George B. R. Gove.","Committee of the Whole House"
+"llhb","048","07300000.tif","017","002","h","","H.R. 209","18221231","Read twice, and committed to a committee of the whole House to-morrow. A Bill For the relief of George B. R. Gove.","Committee of the Whole House"
 "llhb","048","07310000.tif","017","002","h","","H.R. 210","18230102","Read twice, and committed to the Committee of the Whole House, to which is committed the bill extending the time for locating Virginia military land warrants, &c. A Bill Reviving the fifth section of an act of the third of March, one thousand eight hundred and eleven, giving certain pre-emption rights in the state of Louisiana.","Committee of the Whole House"
 "llhb","048","07320000.tif","017","002","h","","H.R. 214","18230103","Read twice, and committed to a Committee of the whole House to-morrow. A Bill To confer certain powers on the Levy Court of the County of Alexandria, in the District of Columbia, and for other purposes.","Committee of the Whole House"
 "llhb","048","07330002.tif","017","002","h","2","H.R. 214","18230103","",""
