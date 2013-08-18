@@ -47,13 +47,111 @@ The CSV format preserves the logical intent of the original. Each row is a page 
 To run, just execute:
 
 	python process_metadata.py
+	
+Here's some example output from `json/llhb045.json`:
+
+	  {
+		"bill_numbers": [
+		  "H.R. 2"
+		],
+		"chamber": "h",
+		"collection": "llhb",
+		"committees": [
+		  "Committee of the Whole House"
+		],
+		"congress": 13,
+		"dates": [
+		  "1813-12-20"
+		],
+		"description": "Read the first and second time and committed to a committee of the whole House on Wednesday next. A Bill To authorise the Secretary of the Treasury to subscribe, in 
+	behalf of the United States, for seven hundred and fifty shares in the capital stock of the Chesapeake and Delaware Canal Company.",
+		"pages": [
+		  {
+			"image": "00020000.tif",
+			"large_image_url": "http://memory.loc.gov/ll/llhb/045/0000/00020000.tif",
+			"link": "http://memory.loc.gov/cgi-bin/ampage?collId=llhb&fileName=045/llhb045.db&recNum=1",
+			"page": null,
+			"record_number": 2,
+			"small_image_url": "http://memory.loc.gov/ll/llhb/045/0000/00020000.gif"
+		  },
+		  {
+			"image": "00030002.tif",
+			"large_image_url": "http://memory.loc.gov/ll/llhb/045/0000/00030002.tif",
+			"link": "http://memory.loc.gov/cgi-bin/ampage?collId=llhb&fileName=045/llhb045.db&recNum=2",
+			"page": 2,
+			"record_number": 3,
+			"small_image_url": "http://memory.loc.gov/ll/llhb/045/0000/00030002.gif"
+		  }
+		],
+		"session": 2,
+		"volume": 45
+	  },
 
 Generating Bill XML
 -------------------
 
 The bills.py script outputs files for each bill in the metadata, using a format compatible with output from the [unitedstates/congress](https://github.com/unitedstates/congress) project.
 
-Files are output to `data/congresses/[congress]/...`, similar to what the congress project does.
+To run, you'll need the Congress project installed and its virtual environment activated. Then execute:
+
+	export PYTHONPATH=../path/to/congress/tasks
+	python bills.py
+
+Files are output to `data/congresses/[congress]/...`, similar to what the congress project does. The same example from above will be found in `data/congresses/13/bills/hr/hr2000020/data.json` and looks like:
+
+	{
+	  "actions": [
+		{
+		  "acted_at": "1813-12-20",
+		  "committee": [
+			"Committee of the Whole House"
+		  ],
+		  "text": "Read the first and second time and committed to a committee of the whole House on Wednesday next. A Bill To authorise the Secretary of the Treasury to subscribe, in behalf of the United States, for seven hundred and fifty shares in the capital stock of the Chesapeake and Delaware Canal Company.",
+		  "type": "referral"
+		}
+	  ],
+	  "bill_id": "hr2000020-13",
+	  "bill_type": "hr",
+	  "chamber": "h",
+	  "committees": [
+		{
+		  "activity": [
+			"referral"
+		  ],
+		  "committee": "Committee of the Whole House",
+		  "committee_id": null
+		}
+	  ],
+	  "congress": 13,
+	  "description": "Read the first and second time and committed to a committee of the whole House on Wednesday next. A Bill To authorise the Secretary of the Treasury to subscribe, in behalf of the United States, for seven hundred and fifty shares in the capital stock of the Chesapeake and Delaware Canal Company.",
+	  "number": "2000020",
+	  "official_title": "To authorise the Secretary of the Treasury to subscribe, in behalf of the United States, for seven hundred and fifty shares in the capital stock of the Chesapeake and Delaware Canal Company.",
+	  "original_bill_number": "H.R. 2",
+	  "session": 2,
+	  "sources": [
+		{
+		  "collection": "llhb",
+		  "source": "ammem",
+		  "source_url": "http://memory.loc.gov/cgi-bin/ampage?collId=llhb&fileName=045/llhb045.db&recNum=1",
+		  "volume": 45
+		}
+	  ],
+	  "status": "REFERRED",
+	  "status_at": null,
+	  "titles": [
+		{
+		  "as": "introduced",
+		  "title": "To authorise the Secretary of the Treasury to subscribe, in behalf of the United States, for seven hundred and fifty shares in the capital stock of the Chesapeake and Delaware Canal Company.",
+		  "type": "official"
+		}
+	  ],
+	  "updated_at": "2013-08-18T15:28:02-04:00",
+	  "urls": {
+		"gif": "http://memory.loc.gov/ll/llhb/045/0000/00020000.gif",
+		"tiff": "http://memory.loc.gov/ll/llhb/045/0000/00020000.tif",
+		"web": "http://memory.loc.gov/cgi-bin/ampage?collId=llhb&fileName=045/llhb045.db&recNum=1"
+	  }
+	}
 
 In the pre-modern era of Congress, bills were not numbered as predictably as they are now. Different bill types were often not distinguished (even from offerings of amendment on existing bills), and the numbering sequence often restarted with new sessions of a single Congress. There were some instances of fractional bill numbers being used to preserve bill numbering order, and there was even an instance of a bill being numbered using roman numerals!
 
