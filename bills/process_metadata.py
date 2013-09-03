@@ -24,7 +24,17 @@ fields = {
 	"llsb": [ ( "collection", None, r"llsb" ), ( "volume", None, r"[0-9]{3}" ), ( "image", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
 	"llsr": [ ( "collection", None, r"llsr" ), ( "volume", None, r"[0-9]{3}" ), ( "image", None, r"[0-9]{8}\.tif" ), ( "congress", None, r"[0-9]{3}" ), ( "session", None, r"[0-9]{3}" ), ( "chamber", None, r"[hs]" ), ( "page", None, r"[0-9]*" ), ( "bill_numbers", ",", r"(?:[A-Za-z.\s]*?)\s*(?:[\dLXVI]+(?: 1/2)?)?\s*" ), ( "dates", ",", r"[0-9]{8}" ), ( "description", None, r".*?" ), ( "committees", "~", r"\s*(?:|\.|Revolutionary [^~]*|Military [^~]*|Whole House [^~]*|(?:Committed to (?:a|the) )?(?:(?:Joint(?: Library)?|Select) )?[Cc][oe]mmitt?e[ed]s?,?[^~]*)" ) ],
 }
-	
+
+bill_types = {
+	"No.": "hr", # Early House bills were just listed as "No."
+	"H.R.": "hr", # Note: Some House bills originally listed with "No." were transcribed as "H.R."
+	"H.R. No.": "hr", # A small number of House bills are listed as "H.R. No."
+	"": "hr", # House bills in certain Congresses are listed only by number.
+	#"H.R.C.C.": "hrcc", # House Court of Claims report
+	"S.": "s",
+	"S.R.": "sjres", # "S.R." is either a Senate Joint Resolution or a Senate bill considered in the House
+}
+
 collection_regex = { }
 
 for collection in fields:
@@ -117,7 +127,7 @@ for fn in sorted(glob.glob("source/*")):
 		new_data = []
 
 		for row in data:
-			# Also compute the URL to view the page on the American Memory website and to
+			# Compute the URL to view the page on the American Memory website and to
 			# the direct links for the TIF and GIF images.
 			record_digits = 5 if (collection, volume) in ( ('llhb', 41), ('llhb', 42) ) else 4
 			row["record_number"] = int(row["image"][0:record_digits])
@@ -142,7 +152,39 @@ for fn in sorted(glob.glob("source/*")):
 					row[field] = int(row[field])
 				else:
 					row[field] = None
-			
+					
+			# Compute a stable numeric identifier when this looks like a bill, relative to the congress
+			# and bill type, but take into account:
+			#  * Bill numbers in this time period were unique within a session but not a congress.
+			#    So, prefix the bill number with a 1, 2, or 3 and zero-pad the actual bill number
+			#    after that.
+			#  * One bill ends with " 1/2". Use an additional digit at the end to represent ".5".
+			#  * One bill is numbered "LXXXV", which is 85, but is not the same as the bill numbered
+			#    "85". Mark this difference with a 1 in the last digiti.
+			bill_no = re.match(r"^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$", ",".join(row["bill_numbers"])) # will fail if row is for multiple bills, which is odd but happens
+			if bill_no is None or row['session'] is None:
+				print "Invalid bill number in %s, volume %d (%d-%s): \"%s\"" % ( row['collection'], row['volume'], row['congress'], str(row['session']) if row['session'] else "null", row["bill_numbers"] )
+			else:
+				bill_type_orig = bill_no.group(1)
+				bill_number = bill_no.group(2)
+				
+				if not bill_type_orig in bill_types:
+					print "Invalid bill type in %s, volume %d (%d-%d): \"%s\"" % ( row['collection'], row['volume'], row['congress'], row['session'], row["bill_numbers"] )
+				else:
+					bill_number_fraction = 0
+					if bill_number.endswith(" 1/2"):
+						bill_number_fraction = 5
+						bill_number = bill_number[:-4]
+					if bill_number == "LXXXV":
+						# This is the only case like this. Just handle it especially.
+						bill_number = 85 # (LXXXV is 85)
+						bill_number_fraction = 1 # distinguish from H.R. 85, which is a different bill!	
+					else:
+						bill_number = int(bill_number)
+					row["bill_type"] = bill_types[bill_type_orig]
+					if bill_number > 9999: raise ValueError("Bill number won't fit in four digits.")
+					row["bill_stable_number"] = int("%d%04d%01d" % (row['session'], bill_number, bill_number_fraction))
+	
 			# Group the pages of documents together.
 			page_fields = ('page', 'image', 'link', 'large_image_url', 'small_image_url', 'record_number')
 			if row["page"] == None:

@@ -29,15 +29,6 @@ collections = [ "llhb", "llsb" ]
 image_path_template = "http://memory.loc.gov/ll/%s/%s/%s/%s.%s"
 
 chambers = { "llhb": "h", "llsb": "s" }
-bill_types = {
-	"No.": "hr", # Early House bills were just listed as "No."
-	"H.R.": "hr", # Note: Some House bills originally listed with "No." were transcribed as "H.R."
-	"H.R. No.": "hr", # A small number of House bills are listed as "H.R. No."
-	"": "hr", # House bills in certain Congresses are listed only by number.
-	"H.R.C.C.": "hrcc", # House Court of Claims report
-	"S.": "s",
-	#"S.R.": "sjres", # "S.R." is either a Senate Joint Resolution or a Senate bill considered in the House
-}
 
 bills = {}
 congress_committees = {}
@@ -45,8 +36,6 @@ calendar = {}
 
 # XXX
 unknown_bill_types = {}
-
-bill_no_pattern = re.compile( "^([A-Za-z.\s]*?)\s*([\dLXVI]+(?: 1/2)?)$" )
 
 print "Parsing bill collection files..."
 
@@ -61,43 +50,13 @@ for collection in collections:
 				for document in metadata:
 					if document['chamber'] != chambers[collection]:
 						raise ValueError( "Unexpected chamber" )
-
-					# XXX: Ensure the few resources that are associated with multiple bills fail to parse as a valid bill.
-					bill_no = ",".join(document["bill_numbers"])
-					
-					# Compute a persistent numeric ID for each document (scoped to congress, session, and document type (bill_type)).
-					bill_no_matches = bill_no_pattern.search( bill_no )
-					if bill_no_matches is None:
-						# The bill number provided doesn't match the expected format, so we have to ensure we use a unique one.
-						print "Invalid bill number in %s, volume %s (%d-%d): \"%s\"" % ( document['collection'], document['volume'], document['congress'], document['session'], bill_no )
-						bill_type = "ammem-%s-%02d-unk" % ( document['collection'], document['volume'] )
-						bill_number = document['pages'][0]['record_number']
-					else:
-						bill_type_orig = bill_no_matches.group( 1 )
-						bill_number = bill_no_matches.group( 2 )
 						
-						bill_number_fraction = 0
-						if bill_number.endswith(" 1/2"):
-							bill_number_fraction = 5
-							bill_number = bill_number[:-4]
+					if 'bill_stable_number' not in document:
+						# not a recognized bill
+						continue
 						
-						if bill_number == "LXXXV":
-							# This is the only case like this. Just handle it especially.
-							bill_number = 85 # (LXXXV is 85)
-							bill_number_fraction = 1 # distinguish from H.R. 85, which is a different bill	
-						else:
-							bill_number = int(bill_number)
-						
-						bill_number = str("%d%05d%01d" % (document['session'], bill_number, bill_number_fraction))
-
-						# If we don't recognize the bill type provided, create a special bill type that we'll know to check later.
-						if bill_type_orig in bill_types:
-							bill_type = bill_types[bill_type_orig]
-						else:
-							unknown_bill_types.setdefault(bill_type_orig, set()).add( (document['collection'], document['volume']) )
-							bill_type = "ammem-%s-%02d-%s" % ( document['collection'], document['volume'], bill_type_orig.lower().replace( '.', '' ).replace( ' ', '' ) )
-
-					bill_id = "%s%s-%d" % ( bill_type, bill_number, document['congress'] )
+					bill_id = document['bill_type'] + str(document['bill_stable_number']) + "-" + str(document['congress'])
+					original_bill_number = "/".join(document['bill_numbers'])
 
 					bill_description = document["description"]
 
@@ -168,7 +127,7 @@ for collection in collections:
 								"source": "%s%s" % ( collection, document['volume'] ),
 								"session": document['session'],
 								"chamber": document['chamber'],
-								"original_bill_number": bill_no,
+								"original_bill_number": original_bill_number,
 								"bill_id": bill_id,
 								"action": action,
 							}
@@ -184,11 +143,11 @@ for collection in collections:
 
 					bill = {
 						"bill_id": bill_id,
-						"bill_type": bill_type,
-						"number": bill_number,
+						"bill_type": document['bill_type'],
+						"number": document['bill_stable_number'],
 						"congress": document['congress'],
 
-						"original_bill_number": bill_no,
+						"original_bill_number": original_bill_number,
 						"session": document['session'],
 						"chamber": document['chamber'],
 
@@ -214,7 +173,7 @@ for collection in collections:
 
 					}
 
-					bills.setdefault(document['congress'], {}).setdefault(bill_type, {})[bill_id] = bill
+					bills.setdefault(document['congress'], {}).setdefault(document['bill_type'], {})[bill_id] = bill
 
 print "Writing committees file..."
 

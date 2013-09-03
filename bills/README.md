@@ -54,6 +54,8 @@ Here's some example output from `json/llhb045.json`:
 		"bill_numbers": [
 		  "H.R. 2"
 		],
+		"bill_stable_number": 200020,
+		"bill_type": "hr",
 		"chamber": "h",
 		"collection": "llhb",
 		"committees": [
@@ -63,8 +65,7 @@ Here's some example output from `json/llhb045.json`:
 		"dates": [
 		  "1813-12-20"
 		],
-		"description": "Read the first and second time and committed to a committee of the whole House on Wednesday next. A Bill To authorise the Secretary of the Treasury to subscribe, in 
-	behalf of the United States, for seven hundred and fifty shares in the capital stock of the Chesapeake and Delaware Canal Company.",
+		"description": "Read the first and second time and committed to a committee of the whole House on Wednesday next. A Bill To authorise the Secretary of the Treasury to subscribe, in behalf of the United States, for seven hundred and fifty shares in the capital stock of the Chesapeake and Delaware Canal Company.",
 		"pages": [
 		  {
 			"image": "00020000.tif",
@@ -86,14 +87,25 @@ Here's some example output from `json/llhb045.json`:
 		"session": 2,
 		"volume": 45
 	  },
+	  
+Bill Numbering
+--------------
+	
+In the pre-modern era of Congress, bills were not numbered as predictably as they are now. Different bill types were often not distinguished (even from offerings of amendment on existing bills), and the numbering sequence often restarted with new sessions of a single Congress. There were some instances of fractional bill numbers being used to preserve bill numbering order, and there was even an instance of a bill being numbered using roman numerals!
 
-Generating Bill XML
--------------------
+To get around this problem, this script *creates* sane bill numbers so that ever bill has a sane, persistent identifier. The number format is roughly `XYYYYZ`, where `X` is the session, `YYYY` is the (zero-padded) bill number, and `Z` is a representation of the fraction (usually `0`, but sometimes `1` and `5`). This is stored in the bill_stable_id field. The corresponding bill type is stored in bill_type, which follows the bill type naming conventions in unitedstates/congress (only 'hr', 's', and 'sjres' types are present in this data). The triple of congress, bill type, and bill_stable_id is unique.
+
+Not all bills have an identifiable bill number. Some records are for multiple bills, or don't actually show a bill number. No bill_stable_id or bill_type fields will be present on these records.
+
+
+Generating Bill Files
+---------------------
 
 The bills.py script outputs files for each bill in the metadata, using a format compatible with output from the [unitedstates/congress](https://github.com/unitedstates/congress) project.
 
 To run, you'll need the Congress project installed and its virtual environment activated. Then execute:
 
+	source ../path/to/congress/virt/bin/activate
 	export PYTHONPATH=../path/to/congress/tasks
 	python bills.py
 
@@ -153,15 +165,4 @@ Files are output to `data/congresses/[congress]/...`, similar to what the congre
 	  }
 	}
 
-In the pre-modern era of Congress, bills were not numbered as predictably as they are now. Different bill types were often not distinguished (even from offerings of amendment on existing bills), and the numbering sequence often restarted with new sessions of a single Congress. There were some instances of fractional bill numbers being used to preserve bill numbering order, and there was even an instance of a bill being numbered using roman numerals!
-
-To get around this problem, this script *creates* sane bill numbers so that ever bill has a sane, persistent identifier. The number format is roughly `XYYYYZ`, where `X` is the session, `YYYY` is the (zero-padded) bill number, and `Z` is a representation of the fraction (usually `0`, but sometimes `5`). The original bill number as given in the original metadata is stored in the original_bill_number field.
-
-There has been some effort made to map the old bill types to the modern bill types, but this is not always possible. In addition to the modern ones, the following bill types have been used:
-
-* `hrcc`: A House report from the Court of Claims.
-* `sr`: A Senate Resolution, a Senate Joint Resolution, or a Senate bill considered in the House.
-* `unk`: The bill type is unknown.
-
-The triple of congress, bill type, and number is unique.
 
