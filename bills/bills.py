@@ -8,20 +8,19 @@
 # This script was written originally by Gordon Hemsley. Modified by
 # Joshua Tauberer.
 #
-# You'll need the Congress project's tasks directory to be on your path:
+# You'll need the Congress project's environment activated and its
+# files on the path:
 #   . ../congress/.env/bin/activate
 #   export PYTHONPATH=../congress/tasks
 
-import sys, os, glob
+import sys, os, os.path, glob
 import datetime, time
 import re
 import json
-from utils import format_datetime
+import utils
 
-###
-
-# Path to congresses metadata.
-CONGRESSES_PATH = "./data/congresses"
+# Get the congress project's data directory.
+CONGRESSES_PATH = os.path.join(os.path.dirname(utils.__file__), os.path.join("..", utils.data_dir()))
 
 ###
 
@@ -33,9 +32,6 @@ chambers = { "llhb": "h", "llsb": "s" }
 bills = {}
 congress_committees = {}
 calendar = {}
-
-# XXX
-unknown_bill_types = {}
 
 print "Parsing bill collection files..."
 
@@ -153,7 +149,7 @@ for collection in collections:
 
 						"actions": actions,
 						"status": bill_status,
-						"status_at": format_datetime(document['dates'][-1]),
+						"status_at": utils.format_datetime(document['dates'][-1]),
 
 						"titles": [ { "type": "official", "as": "introduced", "title": bill_title } ] if bill_title else [],
 						"official_title": bill_title,
@@ -163,7 +159,7 @@ for collection in collections:
 						"committees": committees,
 
 						"sources": sources,
-						"updated_at": format_datetime(datetime.datetime.fromtimestamp(time.time())),
+						"updated_at": utils.format_datetime(datetime.datetime.fromtimestamp(time.time())),
 
 						"urls": {
 							"web": document['pages'][0]['link'],
@@ -177,7 +173,7 @@ for collection in collections:
 
 print "Writing committees file..."
 
-with open("committees.json", "w") as commitees_file:
+with open("historical-committees.json", "w") as commitees_file:
 	json.dump( congress_committees, commitees_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
 
 print "Writing bill data files..."
@@ -208,4 +204,4 @@ for congress in calendar:
 	with open("%s/%s/calendar.json" % ( CONGRESSES_PATH, congress ), "w") as calendar_file:
 		json.dump( calendar[congress], calendar_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
 
-print "Unrecognized Bill Types:", unknown_bill_types
+

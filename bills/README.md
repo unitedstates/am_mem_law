@@ -109,7 +109,7 @@ To run, you'll need the Congress project installed and its virtual environment a
 	export PYTHONPATH=../path/to/congress/tasks
 	python bills.py
 
-Files are output to `data/congresses/[congress]/...`, similar to what the congress project does. The same example from above will be found in `data/congresses/13/bills/hr/hr2000020/data.json` and looks like:
+Files are output to the congress project's data directory using the same naming conventions as modern bills. The same example from above will be found in `data/13/bills/hr/hr200020/data.json` and looks like:
 
 	{
 	  "actions": [
