@@ -17,10 +17,12 @@ import sys, os, os.path, glob
 import datetime, time
 import re
 import json
-import utils
+import bill_info, utils
 
-# Get the congress project's data directory.
-CONGRESSES_PATH = os.path.join(os.path.dirname(utils.__file__), os.path.join("..", utils.data_dir()))
+# Options to pass to bill_info.output_bill.
+
+write_options = { }
+if "--govtrack" in sys.argv: write_options["govtrack"] = True
 
 ###
 
@@ -104,6 +106,7 @@ for collection in collections:
 						action = {
 							"acted_at": bill_date,
 							"text": bill_description,
+							"references": [],
 						}
 
 						# If there are committees associated with the resource, it's probably a referral action.
@@ -140,23 +143,32 @@ for collection in collections:
 					bill = {
 						"bill_id": bill_id,
 						"bill_type": document['bill_type'],
-						"number": document['bill_stable_number'],
-						"congress": document['congress'],
+						"number": str(document['bill_stable_number']),
+						"congress": str(document['congress']),
 
 						"original_bill_number": original_bill_number,
 						"session": document['session'],
 						"chamber": document['chamber'],
 
+						"introduced_at": utils.format_datetime(document['dates'][0]),
+						"sponsor": None, # not yet parsed
+						"cosponsors": [],
+						
 						"actions": actions,
 						"status": bill_status,
 						"status_at": utils.format_datetime(document['dates'][-1]),
 
-						"titles": [ { "type": "official", "as": "introduced", "title": bill_title } ] if bill_title else [],
+						"titles": [ { "type": "official", "as": "introduced", "title": bill_title, "is_for_portion": False } ] if bill_title else [],
 						"official_title": bill_title,
 
 						"description": bill_description,
 
 						"committees": committees,
+						
+						"related_bills": [],
+						"subjects_top_term": None,
+						"subjects": [],
+						"amendments": [],
 
 						"sources": sources,
 						"updated_at": utils.format_datetime(datetime.datetime.fromtimestamp(time.time())),
@@ -171,6 +183,10 @@ for collection in collections:
 
 					bills.setdefault(document['congress'], {}).setdefault(document['bill_type'], {})[bill_id] = bill
 
+# Move to the congress project directory so the output done by bill_info.output_bill
+# gets to the right place.
+os.chdir(os.path.join(os.path.dirname(utils.__file__), ".."))
+
 print "Writing committees file..."
 
 with open("historical-committees.json", "w") as commitees_file:
@@ -182,26 +198,16 @@ for congress in bills:
 	for bill_type in bills[congress]:
 		for bill_id in bills[congress][bill_type]:
 			bill = bills[congress][bill_type][bill_id]
-
-			# XXX: congress.utils.write()
-
-			bill_dir = "%s/%d/bills/%s/%s%s" % ( CONGRESSES_PATH, congress, bill_type, bill_type, bill["number"] ) # XXX: congress.utils.data_dir()
-
 			try:
-				os.makedirs( bill_dir )
-			except OSError:
-				# Directory already exists, but we don't care.
-				pass
-
-			bill_path = "%s/data.json" % ( bill_dir )
-
-			with open(bill_path, "w") as bill_file:
-				json.dump( bill, bill_file, indent=2, separators=(',', ': '), sort_keys=True )
+				bill_info.output_bill(bill, write_options)
+			except:
+				print bill["bill_id"]
+				raise
 
 print "Writing calendar files..."
 
 for congress in calendar:
-	with open("%s/%s/calendar.json" % ( CONGRESSES_PATH, congress ), "w") as calendar_file:
+	with open("%s/%s/calendar.json" % ( utils.data_dir(), congress ), "w") as calendar_file:
 		json.dump( calendar[congress], calendar_file, indent=2, separators=(',', ': '), sort_keys=True, default=(lambda obj: sorted(list(obj)) if isinstance(obj, set) else json.JSONEncoder.default(obj)) )
 
 
