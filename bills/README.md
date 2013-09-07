@@ -31,8 +31,7 @@ These files look like CSV but are actually hard to parse correctly (see process_
 A mirror of the originals (including metadata from other collections) are also currently stored at http://www.govtrack.us/data/misc/am_mem_law_metadata.tgz (187M). The file llsb004.txt appears to have been accidentally truncated on the memory.loc.gov website. Some day we'll check with the Library of Congress about whether they have the rest of the file.
 
 Each original metadata record represents a single physical page of a document printed in one of the volumes. A document could be a bill or resolution, or an amendment to a bill or resolution, or perhaps other
-sorts of bill/resolution-related document. Some documents are somehow related to multiple bills.
-(In the JSON format described below, the bill_numbers field is an array.)
+sorts of bill/resolution-related documents. Bills/resolutions may occur more than once if they were printed multiple times (as is the practice today, too). Some documents are somehow related to multiple bills and we've indicated this by making the bill_numbers field an array.
 
 Processing the Data
 -------------------

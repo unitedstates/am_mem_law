@@ -10,8 +10,9 @@
 #
 # You'll need the Congress project's environment activated and its
 # files on the path:
-#   . ../congress/.env/bin/activate
-#   export PYTHONPATH=../congress/tasks
+#   source ../../congress/.env/bin/activate
+#   export PYTHONPATH=../../congress/tasks
+#   python bills.py
 
 import sys, os, os.path, glob
 import datetime, time
@@ -54,134 +55,120 @@ for collection in collections:
 						continue
 						
 					bill_id = document['bill_type'] + str(document['bill_stable_number']) + "-" + str(document['congress'])
-					original_bill_number = "/".join(document['bill_numbers'])
 
-					bill_description = document["description"]
+					# A bill can appear multiple times because it may have been reprinted after
+					# major activity. Turn each print into action information.
+					bill = bills\
+						.setdefault(document['congress'], {})\
+						.setdefault(document['bill_type'], {})\
+						.setdefault(bill_id, {
+							"bill_id": bill_id,
+							"bill_type": document['bill_type'],
+							"number": str(document['bill_stable_number']),
+							"congress": str(document['congress']),
+							
+							"updated_at": utils.format_datetime(datetime.datetime.fromtimestamp(time.time())),
+	
+							"original_bill_number": "/".join(document['bill_numbers']),
+							"session": document['session'],
+							"chamber": document['chamber'],
+	
+							"introduced_at": utils.format_datetime(document['dates'][0]),
+							
+							# filled in below
+							"titles": [],
+							"official_title": None,
+							"committees": [],
+							"actions": [],
 
-					committees = []
-					committee_names = document["committees"]
+							# not yet scraped
+							"sponsor": None,
+							
+							# not known
+							"cosponsors": [],
+							"related_bills": [],
+							"subjects_top_term": None,
+							"subjects": [],
+							"amendments": [],
+						})
+	
+					# Take some metadata like the title and status from the most recent print. Assumes the records in
+					# each JSON file are in chronological order.\
 
-					for committee in committee_names:
-						if document['chamber'] not in congress_committees:
-							congress_committees[document['chamber']] = {}
+					# The original description field.
+					bill["description"] = document["description"]
 
-						if committee not in congress_committees[document['chamber']]:
-							congress_committees[document['chamber']][committee] = set()
+					# Scrape the title out of the description field.
+					bill_heading = None
+					bill_title_match = re.search( "(An Act|A Bill),? (.+?)(: Therefore,)?$", bill["description"] )
+					if bill_title_match:
+						bill_heading = bill_title_match.group(1)
+						bill_title = bill_title_match.group(2)
+						bill["titles"] = [ { "type": "official", "as": "introduced", "title": bill_title, "is_for_portion": False } ]
+						bill["official_title"] = bill_title
+					else:
+						pass # print "Invalid bill title:", bill["description"]
 
-						congress_committees[document['chamber']][committee].add(document['congress'])
-
-						committee_info = {
+					# Committees.
+					for committee in document["committees"]:
+						# We may have seen this committee in a previous print.
+						if committee in [c["committee"] for c in bill["committees"]]: continue
+						
+						# Create a committee record.
+						bill["committees"].append({
 							"committee": committee,
 							"activity": [ "referral" ], # XXX
 							"committee_id": None, # XXX
-						}
+						})
 
-						committees.append( committee_info )
+						# Mark off the committee names we've seen.
+						congress_committees.setdefault(document['chamber'], {}).setdefault(committee, set()).add(document['congress'])
 
+					# Current status.
 					bill_status = "INTRODUCED"
-					bill_title = None
-
-					bill_title_match = re.search( "(An Act|A Bill),? (.+\.)$", bill_description )
-
-					if bill_title_match:
-						if bill_title_match.group(1) == "An Act":
-							# If listed as an act, assume it has passed the other chamber.
-							bill_status = "PASS_OVER:HOUSE" if document['chamber'] == "s" else "PASS_OVER:SENATE"
-						elif re.search( "[Rr]eported", bill_description ):
-							bill_status = "REPORTED"
-						elif len(committees) > 0:
-							bill_status = "REFERRED"
-
-						bill_title = bill_title_match.group(2)
-
-					bill_dates = document["dates"]
-
-					if document['congress'] not in calendar:
-						calendar[document['congress']] = {}
-
-					actions = []
-
-					# Sometimes the bill has multiple dates associated with it, so we'll treat each as a separate action.
-					for bill_date in bill_dates:
-						action = {
-							"acted_at": bill_date,
-							"text": bill_description,
-							"references": [],
-						}
-
-						# If there are committees associated with the resource, it's probably a referral action.
-						if committee_names != []:
-							action["type"] = "referral"
-							action["committee"] = committee_names
-						else:
-							action["type"] = "action"
-
-						actions.append( action )
-
-						if ( action["text"] != "" ) or ( "committee" in action ):
-							if bill_date not in calendar[document['congress']]:
-								calendar[document['congress']][bill_date] = []
-
-							calendar_item = {
-								"source": "%s%s" % ( collection, document['volume'] ),
-								"session": document['session'],
-								"chamber": document['chamber'],
-								"original_bill_number": original_bill_number,
-								"bill_id": bill_id,
-								"action": action,
-							}
-
-							calendar[document['congress']][bill_date].append( calendar_item )
-
-					sources = [{
+					if bill_heading == "An Act": bill_status = "ENACTED:SIGNED" # best guess
+					bill["status"] = bill_status
+					bill["status_at"] = utils.format_datetime(document['dates'][-1])
+					
+					# Source links.
+					source_info = {
 						"source": "ammem",
 						"collection": document['collection'],
 						"volume": document['volume'],
 						"source_url": document['pages'][0]['link'],
-					}]
-
-					bill = {
-						"bill_id": bill_id,
-						"bill_type": document['bill_type'],
-						"number": str(document['bill_stable_number']),
-						"congress": str(document['congress']),
-
-						"original_bill_number": original_bill_number,
-						"session": document['session'],
-						"chamber": document['chamber'],
-
-						"introduced_at": utils.format_datetime(document['dates'][0]),
-						"sponsor": None, # not yet parsed
-						"cosponsors": [],
-						
-						"actions": actions,
-						"status": bill_status,
-						"status_at": utils.format_datetime(document['dates'][-1]),
-
-						"titles": [ { "type": "official", "as": "introduced", "title": bill_title, "is_for_portion": False } ] if bill_title else [],
-						"official_title": bill_title,
-
-						"description": bill_description,
-
-						"committees": committees,
-						
-						"related_bills": [],
-						"subjects_top_term": None,
-						"subjects": [],
-						"amendments": [],
-
-						"sources": sources,
-						"updated_at": utils.format_datetime(datetime.datetime.fromtimestamp(time.time())),
-
-						"urls": {
-							"web": document['pages'][0]['link'],
-							"tiff": document['pages'][0]['large_image_url'],
-							"gif": document['pages'][0]['small_image_url'],
-						},
-
 					}
+					bill["sources"] = [source_info] # just use the most recent
+						
+					# Action.
+					action = {
+						"acted_at": document["dates"][0], #Sometimes the bill has multiple dates associated with it
+						"text": bill["description"],
+						"references": [],
+						"source": source_info,
+					}
+					if len(document["committees"]) > 0:
+						# If there are committees associated with the resource, it's probably a referral action.
+						action["type"] = "referral"
+						action["committee"] = document["committees"]
+					else:
+						action["type"] = "action"
+					bill["actions"].append( action )
+					if ( action["text"] != "" ) or ( "committee" in action ):
+						calendar.setdefault(document['congress'], {}).setdefault(action["acted_at"], []).append({
+							"source": "%s%s" % ( collection, document['volume'] ),
+							"session": document['session'],
+							"chamber": document['chamber'],
+							"bill_id": bill_id,
+							"action": action,
+						})
 
-					bills.setdefault(document['congress'], {}).setdefault(document['bill_type'], {})[bill_id] = bill
+					# Set 'urls' to the most recent version.
+					bill["urls"] = {
+						"web": document['pages'][0]['link'],
+						"tiff": document['pages'][0]['large_image_url'],
+						"gif": document['pages'][0]['small_image_url'],
+					}
+					
 
 # Move to the congress project directory so the output done by bill_info.output_bill
 # gets to the right place.
